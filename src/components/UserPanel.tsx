@@ -29,6 +29,9 @@ export const UserPanel = () => {
     }
   })
 
+  // Debug logging
+  console.log('UserPanel - activeTransaction data:', activeTransaction)
+
   const { writeContract, data: hash, isPending, error } = useWriteContract({
     mutation: {
       onError: (error) => {
@@ -57,7 +60,22 @@ export const UserPanel = () => {
   }, [isSuccess, hash, refetchActive, toast])
 
   const handlePayment = () => {
-    if (!activeTransaction || activeTransaction[1] === 0n) {
+    console.log('handlePayment - activeTransaction:', activeTransaction)
+    
+    if (!activeTransaction) {
+      console.log('No activeTransaction data')
+      toast({
+        title: "No Active Transaction",
+        description: "There's no payment request to process",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
+    console.log('hasValidTransaction:', hasValidTransaction, 'id:', activeTransaction[0]?.toString(), 'amount:', activeTransaction[1]?.toString())
+    
+    if (!hasValidTransaction) {
       toast({
         title: "No Active Transaction",
         description: "There's no payment request to process",
@@ -66,6 +84,7 @@ export const UserPanel = () => {
       return
     }
 
+    console.log('Attempting payment for amount:', activeTransaction[1]?.toString())
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
@@ -75,18 +94,29 @@ export const UserPanel = () => {
   }
 
   const getTransactionStatus = () => {
-    if (!activeTransaction || activeTransaction[1] === 0n) {
+    if (!activeTransaction) {
+      console.log('getTransactionStatus: no activeTransaction')
+      return { status: 'none', icon: Clock, color: 'secondary' }
+    }
+    
+    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
+    console.log('getTransactionStatus hasValidTransaction:', hasValidTransaction)
+    
+    if (!hasValidTransaction) {
       return { status: 'none', icon: Clock, color: 'secondary' }
     }
     
     if (activeTransaction[6]) { // cancelled
+      console.log('Transaction is cancelled')
       return { status: 'cancelled', icon: XCircle, color: 'destructive' }
     }
     
     if (activeTransaction[3]) { // paid
+      console.log('Transaction is paid')
       return { status: 'paid', icon: CheckCircle, color: 'default' }
     }
     
+    console.log('Transaction is pending')
     return { status: 'pending', icon: Clock, color: 'default' }
   }
 
@@ -125,7 +155,7 @@ export const UserPanel = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {activeTransaction && activeTransaction[1] !== 0n ? (
+          {activeTransaction && activeTransaction[0] > 0n && activeTransaction[1] > 0n ? (
             <>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

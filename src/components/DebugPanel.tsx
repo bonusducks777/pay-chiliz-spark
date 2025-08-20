@@ -47,7 +47,18 @@ export const DebugPanel = () => {
     functionName: 'getPaymentStatus',
   })
 
+  // Debug logging
+  console.log('DebugPanel data:', {
+    owner,
+    txCounter,
+    maxRecentTx,
+    activeTransaction,
+    recentTransactions,
+    paymentStatus
+  })
+
   const handleRefresh = () => {
+    console.log('Debug panel refresh triggered')
     refetchOwner()
     refetchTxCounter()
     refetchMaxRecentTx()

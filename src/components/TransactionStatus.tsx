@@ -16,22 +16,46 @@ export const TransactionStatus = () => {
     }
   })
 
+  // Debug log to see what we're getting
+  console.log('TransactionStatus - activeTransaction data:', activeTransaction)
+
   const getStatusIcon = () => {
-    if (!activeTransaction || activeTransaction[1] === 0n) return Clock
-    if (activeTransaction[6]) return XCircle // cancelled
-    if (activeTransaction[3]) return CheckCircle // paid
+    console.log('getStatusIcon - activeTransaction:', activeTransaction)
+    if (!activeTransaction) {
+      console.log('No activeTransaction data')
+      return Clock
+    }
+    
+    // Check if transaction exists (id > 0 and amount > 0)
+    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
+    console.log('hasValidTransaction:', hasValidTransaction, 'id:', activeTransaction[0]?.toString(), 'amount:', activeTransaction[1]?.toString())
+    
+    if (!hasValidTransaction) return Clock
+    if (activeTransaction[6]) {
+      console.log('Transaction cancelled')
+      return XCircle // cancelled
+    }
+    if (activeTransaction[3]) {
+      console.log('Transaction paid')
+      return CheckCircle // paid
+    }
+    console.log('Transaction pending')
     return Activity // pending
   }
 
   const getStatusColor = () => {
-    if (!activeTransaction || activeTransaction[1] === 0n) return 'secondary'
+    if (!activeTransaction) return 'secondary'
+    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
+    if (!hasValidTransaction) return 'secondary'
     if (activeTransaction[6]) return 'destructive'
     if (activeTransaction[3]) return 'default'
     return 'default'
   }
 
   const getStatusText = () => {
-    if (!activeTransaction || activeTransaction[1] === 0n) return 'No Active Transaction'
+    if (!activeTransaction) return 'No Active Transaction'
+    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
+    if (!hasValidTransaction) return 'No Active Transaction'
     if (activeTransaction[6]) return 'Cancelled'
     if (activeTransaction[3]) return 'Paid'
     return 'Awaiting Payment'
@@ -53,7 +77,7 @@ export const TransactionStatus = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {activeTransaction && activeTransaction[1] !== 0n ? (
+          {activeTransaction && activeTransaction[0] > 0n && activeTransaction[1] > 0n ? (
             <>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>

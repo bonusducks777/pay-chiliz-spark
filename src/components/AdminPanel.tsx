@@ -38,6 +38,7 @@ export const AdminPanel = () => {
   // Handle successful transactions
   React.useEffect(() => {
     if (isSuccess && hash) {
+      console.log('AdminPanel - Transaction successful, hash:', hash)
       toast({
         title: "Transaction Successful!",
         description: "Your transaction has been confirmed on the blockchain",
@@ -46,7 +47,10 @@ export const AdminPanel = () => {
   }, [isSuccess, hash, toast])
 
   const handleSetTransaction = async () => {
+    console.log('handleSetTransaction called with:', { amount, description })
+    
     if (!amount || !description) {
+      console.log('Missing amount or description')
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -55,6 +59,7 @@ export const AdminPanel = () => {
       return
     }
 
+    console.log('Setting active transaction...')
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
@@ -67,6 +72,7 @@ export const AdminPanel = () => {
   }
 
   const handleCancelTransaction = () => {
+    console.log('handleCancelTransaction called')
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
@@ -75,7 +81,10 @@ export const AdminPanel = () => {
   }
 
   const handleWithdraw = () => {
+    console.log('handleWithdraw called with address:', withdrawAddress)
+    
     if (!withdrawAddress) {
+      console.log('Missing withdrawal address')
       toast({
         title: "Error",
         description: "Please enter withdrawal address",
@@ -84,6 +93,7 @@ export const AdminPanel = () => {
       return
     }
 
+    console.log('Initiating withdrawal...')
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,

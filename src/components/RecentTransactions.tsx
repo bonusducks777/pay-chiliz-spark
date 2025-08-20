@@ -17,6 +17,9 @@ export const RecentTransactions = () => {
     }
   })
 
+  // Debug logging
+  console.log('RecentTransactions - data:', recentTransactions)
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
