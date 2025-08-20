@@ -52,16 +52,27 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
+				terminal: {
+					bg: 'hsl(var(--terminal-bg))',
+					green: 'hsl(var(--terminal-green))',
+					cyan: 'hsl(var(--terminal-cyan))',
+					yellow: 'hsl(var(--terminal-yellow))',
+					red: 'hsl(var(--terminal-red))',
+					blue: 'hsl(var(--terminal-blue))'
 				}
+			},
+			backgroundImage: {
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-card': 'var(--gradient-card)',
+				'gradient-glow': 'var(--gradient-glow)'
+			},
+			boxShadow: {
+				'glow': 'var(--shadow-glow)',
+				'card': 'var(--shadow-card)',
+				'terminal': 'var(--shadow-terminal)'
+			},
+			fontFamily: {
+				'mono': ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -69,6 +80,15 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			keyframes: {
+				glow: {
+					'0%, 100%': { boxShadow: '0 0 20px hsl(var(--primary) / 0.3)' },
+					'50%': { boxShadow: '0 0 40px hsl(var(--primary) / 0.6)' }
+				},
+				terminal: {
+					'0%': { opacity: '0.8' },
+					'50%': { opacity: '1' },
+					'100%': { opacity: '0.8' }
+				},
 				'accordion-down': {
 					from: {
 						height: '0'
@@ -87,6 +107,8 @@ export default {
 				}
 			},
 			animation: {
+				glow: 'glow 2s ease-in-out infinite',
+				terminal: 'terminal 1.5s ease-in-out infinite',
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
 			}
