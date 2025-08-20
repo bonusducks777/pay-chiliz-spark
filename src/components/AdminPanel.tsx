@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as React from 'react'
 import { motion } from 'framer-motion'
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseEther } from 'viem'
@@ -18,11 +19,31 @@ export const AdminPanel = () => {
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const { toast } = useToast()
 
-  const { writeContract, data: hash, isPending } = useWriteContract()
+  const { writeContract, data: hash, isPending, error } = useWriteContract({
+    mutation: {
+      onError: (error) => {
+        toast({
+          title: "Transaction Failed",
+          description: error.message || "Transaction failed to execute",
+          variant: "destructive"
+        })
+      }
+    }
+  })
   
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   })
+
+  // Handle successful transactions
+  React.useEffect(() => {
+    if (isSuccess && hash) {
+      toast({
+        title: "Transaction Successful!",
+        description: "Your transaction has been confirmed on the blockchain",
+      })
+    }
+  }, [isSuccess, hash, toast])
 
   const handleSetTransaction = async () => {
     if (!amount || !description) {
@@ -34,28 +55,15 @@ export const AdminPanel = () => {
       return
     }
 
-    try {
-      writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'setActiveTransaction',
-        args: [parseEther(amount), description],
-      } as any)
-      
-      toast({
-        title: "Transaction Created",
-        description: `Payment request for ${amount} CHZ created`,
-      })
-      
-      setAmount('')
-      setDescription('')
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create transaction",
-        variant: "destructive"
-      })
-    }
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'setActiveTransaction',
+      args: [parseEther(amount), description],
+    } as any)
+    
+    setAmount('')
+    setDescription('')
   }
 
   const handleCancelTransaction = () => {
@@ -64,11 +72,6 @@ export const AdminPanel = () => {
       abi: CONTRACT_ABI,
       functionName: 'cancelActiveTransaction',
     } as any)
-    
-    toast({
-      title: "Transaction Cancelled",
-      description: "Active transaction has been cancelled",
-    })
   }
 
   const handleWithdraw = () => {
@@ -88,10 +91,7 @@ export const AdminPanel = () => {
       args: [withdrawAddress as `0x${string}`],
     } as any)
     
-    toast({
-      title: "Withdrawal Initiated",
-      description: `Withdrawing funds to ${withdrawAddress}`,
-    })
+    setWithdrawAddress('')
   }
 
   return (

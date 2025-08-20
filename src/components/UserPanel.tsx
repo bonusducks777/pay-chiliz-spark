@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi'
+import * as React from 'react'
 import { useAccount } from 'wagmi'
 import { formatEther } from 'viem'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,22 +24,37 @@ export const UserPanel = () => {
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransaction',
+    query: {
+      refetchInterval: 2000, // Refetch every 2 seconds for real-time updates
+    }
   })
 
-  const { writeContract, data: hash, isPending } = useWriteContract()
+  const { writeContract, data: hash, isPending, error } = useWriteContract({
+    mutation: {
+      onError: (error) => {
+        toast({
+          title: "Transaction Failed",
+          description: error.message || "Failed to process payment",
+          variant: "destructive"
+        })
+      }
+    }
+  })
   
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   })
 
   // Handle successful payment
-  if (isSuccess && hash) {
-    refetchActive()
-    toast({
-      title: "Payment Successful!",
-      description: "Your payment has been processed",
-    })
-  }
+  React.useEffect(() => {
+    if (isSuccess && hash) {
+      refetchActive()
+      toast({
+        title: "Payment Successful!",
+        description: "Your payment has been processed successfully",
+      })
+    }
+  }, [isSuccess, hash, refetchActive, toast])
 
   const handlePayment = () => {
     if (!activeTransaction || activeTransaction[1] === 0n) {

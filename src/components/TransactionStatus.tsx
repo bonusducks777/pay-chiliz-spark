@@ -7,10 +7,13 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
 import { Activity, CheckCircle, XCircle, Clock } from 'lucide-react'
 
 export const TransactionStatus = () => {
-  const { data: activeTransaction } = useReadContract({
+  const { data: activeTransaction, refetch } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransaction',
+    query: {
+      refetchInterval: 2000, // Refetch every 2 seconds for real-time updates
+    }
   })
 
   const getStatusIcon = () => {

@@ -8,10 +8,13 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
 import { History, CheckCircle, XCircle } from 'lucide-react'
 
 export const RecentTransactions = () => {
-  const { data: recentTransactions } = useReadContract({
+  const { data: recentTransactions, refetch } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getRecentTransactions',
+    query: {
+      refetchInterval: 3000, // Refetch every 3 seconds for real-time updates
+    }
   })
 
   return (

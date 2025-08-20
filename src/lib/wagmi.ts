@@ -30,7 +30,7 @@ export const config = getDefaultConfig({
 })
 
 // Contract configuration
-export const CONTRACT_ADDRESS = '0x0518b93D909E6cF6139E5d54FAfef91830AA04c0' as const
+export const CONTRACT_ADDRESS = '0x0352e8a640b5bdfa98499221a7dc8b9318eecd1b' as const
 
 export const CONTRACT_ABI = [
   {
