@@ -1,5 +1,15 @@
 import React, { useState } from 'react'
 import { useReadContract, useWriteContract } from 'wagmi'
+import { motion } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { Code, Database, Eye, RefreshCw, Clock } from 'lucide-react'
+
+export const DebugPanel = () => {
   // Contract balance
   const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -33,16 +43,7 @@ import { useReadContract, useWriteContract } from 'wagmi'
       functionName: 'clearActiveTransaction',
     } as any)
   }
-import { motion } from 'framer-motion'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
-import { Code, Database, Eye, RefreshCw } from 'lucide-react'
 
-export const DebugPanel = () => {
   // Individual contract reads to avoid type issues
   const { data: owner, refetch: refetchOwner } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -68,46 +69,6 @@ export const DebugPanel = () => {
     functionName: 'getActiveTransactionFields',
   })
 
-  const { data: txCount } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getRecentTransactionsCount',
-  })
-
-  // Fetch each transaction by index
-  const txIndices = txCount && typeof txCount === 'bigint' ? Array.from({ length: Number(txCount) }, (_, i) => i) : [];
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    async function fetchAll() {
-      if (!txIndices.length) {
-        setRecentTransactions([]);
-        return;
-      }
-      const results = await Promise.all(
-        txIndices.map(async (i) => {
-          try {
-            const res = await window.ethereum.request({
-              method: 'eth_call',
-              params: [{
-                to: CONTRACT_ADDRESS,
-                data: (window as any).wagmiConfig.contracts[CONTRACT_ADDRESS].interface.encodeFunctionData('getRecentTransactionFields', [i])
-              }, 'latest']
-            });
-            // decode result
-            return (window as any).wagmiConfig.contracts[CONTRACT_ADDRESS].interface.decodeFunctionResult('getRecentTransactionFields', res);
-          } catch {
-            return null;
-          }
-        })
-      );
-      if (!cancelled) setRecentTransactions(results.filter(Boolean));
-    }
-    fetchAll();
-    return () => { cancelled = true; };
-  }, [txIndices.length, CONTRACT_ADDRESS]);
-
   const { data: paymentStatus, refetch: refetchPaymentStatus } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
@@ -120,7 +81,7 @@ export const DebugPanel = () => {
     txCounter,
     maxRecentTx,
     activeTransaction,
-    recentTransactions,
+    allRecentTransactions,
     paymentStatus
   })
 
@@ -130,7 +91,7 @@ export const DebugPanel = () => {
     refetchTxCounter()
     refetchMaxRecentTx()
     refetchActiveTransaction()
-  // refetchRecentTransactions() // removed, no longer used
+    refetchContractBalance()
     refetchPaymentStatus()
   }
 
@@ -148,14 +109,18 @@ export const DebugPanel = () => {
     { name: 'txCounter', description: 'Total transaction counter' },
     { name: 'MAX_RECENT_TX', description: 'Maximum recent transactions stored' },
     { name: 'activeTransaction', description: 'Current active transaction struct' },
-    { name: 'getActiveTransaction', description: 'Get active transaction details' },
-    { name: 'getRecentTransactions', description: 'Array of recent transactions' },
+    { name: 'getActiveTransactionFields', description: 'Get active transaction fields as tuple' },
+    { name: 'getAllRecentTransactions', description: 'Get all recent transactions as tuple arrays' },
     { name: 'getPaymentStatus', description: 'Payment status of active transaction' },
+    { name: 'getContractBalance', description: 'Get current contract balance' },
+    { name: 'getRecentTransactionsCount', description: 'Get count of recent transactions' },
+    { name: 'getRecentTransactionFields', description: 'Get specific transaction by index' },
   ]
 
   const writeFunctions = [
     { name: 'setActiveTransaction', description: 'Create new payment request (Owner only)', params: ['uint256 amount', 'string description'] },
     { name: 'cancelActiveTransaction', description: 'Cancel current transaction (Owner only)', params: [] },
+    { name: 'clearActiveTransaction', description: 'Clear completed transaction (Owner only)', params: [] },
     { name: 'payActiveTransaction', description: 'Pay the active transaction', params: [] },
     { name: 'withdraw', description: 'Withdraw contract balance (Owner only)', params: ['address payable to'] },
   ]
@@ -232,7 +197,7 @@ export const DebugPanel = () => {
           <Card className="shadow-card bg-gradient-card border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <History className="w-5 h-5 text-primary" />
+                <Clock className="w-5 h-5 text-primary" />
                 All Recent Transactions
               </CardTitle>
             </CardHeader>
@@ -357,7 +322,7 @@ export const DebugPanel = () => {
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Contract Balance</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    Check via external balance query
+                    {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
                   </div>
                 </div>
               </div>

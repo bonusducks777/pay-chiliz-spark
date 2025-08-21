@@ -2,22 +2,6 @@ import { useState } from 'react'
 import * as React from 'react'
 import { motion } from 'framer-motion'
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
-  // Get contract balance
-  const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getContractBalance',
-    query: { refetchInterval: 5000 },
-  })
-
-  // Clear active transaction
-  const handleClearActiveTransaction = () => {
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: 'clearActiveTransaction',
-    } as any)
-  }
 import { parseEther } from 'viem'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +18,14 @@ export const AdminPanel = () => {
   const [description, setDescription] = useState('')
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const { toast } = useToast()
+
+  // Get contract balance
+  const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getContractBalance',
+    query: { refetchInterval: 5000 },
+  })
 
   const { writeContract, data: hash, isPending, error } = useWriteContract({
     mutation: {
@@ -120,6 +112,16 @@ export const AdminPanel = () => {
     setWithdrawAddress('')
   }
 
+  // Clear active transaction
+  const handleClearActiveTransaction = () => {
+    console.log('handleClearActiveTransaction called')
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'clearActiveTransaction',
+    } as any)
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -202,7 +204,14 @@ export const AdminPanel = () => {
                 disabled={isPending || isConfirming}
                 className="w-full mb-2"
               >
-                Clear Active Transaction
+                {isPending || isConfirming ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Clearing...
+                  </>
+                ) : (
+                  'Clear Active Transaction'
+                )}
               </Button>
             <Button 
               variant="destructive" 

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
-import { History, CheckCircle, XCircle } from 'lucide-react'
+import { Clock, CheckCircle, XCircle } from 'lucide-react'
 
 export const RecentTransactions = () => {
   // Use new getAllRecentTransactions for efficient loading
@@ -17,20 +17,37 @@ export const RecentTransactions = () => {
     query: { refetchInterval: 3000 },
   })
 
-  // allTxData is a tuple of arrays: [ids, amounts, payers, paids, timestamps, descriptions, cancelleds]
+  // Parse the transaction data from the new contract format
   const recentTransactions = React.useMemo(() => {
-    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) return [];
-    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData;
-    return ids.map((id: any, i: number) => [
-      id,
-      amounts[i],
-      payers[i],
-      paids[i],
-      timestamps[i],
-      descriptions[i],
-      cancelleds[i],
-    ]);
-  }, [allTxData]);
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) {
+      console.log('RecentTransactions - No valid data:', allTxData)
+      return []
+    }
+
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      console.log('RecentTransactions - No transactions found')
+      return []
+    }
+
+    const transactions = ids.map((id, index) => ({
+      id: id,
+      amount: amounts[index],
+      payer: payers[index],
+      paid: paids[index],
+      timestamp: timestamps[index],
+      description: descriptions[index],
+      cancelled: cancelleds[index]
+    }))
+
+    console.log('RecentTransactions - Parsed transactions:', transactions)
+    return transactions
+  }, [allTxData])
+
+  React.useEffect(() => {
+    console.log('RecentTransactions - Raw data:', allTxData)
+  }, [allTxData])
 
   return (
     <motion.div
@@ -41,7 +58,7 @@ export const RecentTransactions = () => {
       <Card className="shadow-card bg-gradient-card border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <History className="w-5 h-5 text-primary" />
+            <Clock className="w-5 h-5 text-primary" />
             Recent Transactions
           </CardTitle>
         </CardHeader>
@@ -51,7 +68,7 @@ export const RecentTransactions = () => {
               <div className="space-y-3">
                 {[...recentTransactions].reverse().map((tx, index) => (
                   <motion.div
-                    key={tx[0].toString()}
+                    key={tx.id.toString()}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
@@ -59,34 +76,36 @@ export const RecentTransactions = () => {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                        {tx[6] ? (
+                        {tx.cancelled ? (
                           <XCircle className="w-4 h-4 text-destructive" />
-                        ) : tx[3] ? (
+                        ) : tx.paid ? (
                           <CheckCircle className="w-4 h-4 text-primary" />
-                        ) : null}
+                        ) : (
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm">#{tx[0].toString()}</span>
+                          <span className="font-mono text-sm">#{tx.id.toString()}</span>
                           <Badge
-                            variant={tx[6] ? 'destructive' : tx[3] ? 'default' : 'secondary'}
+                            variant={tx.cancelled ? 'destructive' : tx.paid ? 'default' : 'secondary'}
                             className="text-xs"
                           >
-                            {tx[6] ? 'Cancelled' : tx[3] ? 'Paid' : 'Pending'}
+                            {tx.cancelled ? 'Cancelled' : tx.paid ? 'Paid' : 'Pending'}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground truncate max-w-32">
-                          {tx[5]}
+                          {tx.description}
                         </p>
                       </div>
                     </div>
 
                     <div className="text-right">
                       <div className="font-mono text-sm text-primary">
-                        {formatEther(tx[1])} CHZ
+                        {formatEther(tx.amount)} CHZ
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(Number(tx[4]) * 1000).toLocaleDateString()}
+                        {new Date(Number(tx.timestamp) * 1000).toLocaleDateString()}
                       </div>
                     </div>
                   </motion.div>
@@ -94,7 +113,7 @@ export const RecentTransactions = () => {
               </div>
             ) : (
               <div className="text-center py-12">
-                <History className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Recent Transactions</h3>
                 <p className="text-muted-foreground text-sm">
                   Transaction history will appear here

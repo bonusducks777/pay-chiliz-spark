@@ -1,4 +1,5 @@
 import { useReadContract } from 'wagmi'
+import * as React from 'react'
 import { formatEther } from 'viem'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +19,23 @@ export const TransactionStatus = () => {
 
   // Helper: is valid struct
   const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 7 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('TransactionStatus - Active transaction data:', activeTransaction)
+    console.log('TransactionStatus - Is valid:', isValidActiveTx)
+    if (isValidActiveTx) {
+      console.log('TransactionStatus - Transaction details:', {
+        id: activeTransaction[0].toString(),
+        amount: activeTransaction[1].toString(),
+        payer: activeTransaction[2],
+        paid: activeTransaction[3],
+        timestamp: activeTransaction[4].toString(),
+        description: activeTransaction[5],
+        cancelled: activeTransaction[6]
+      })
+    }
+  }, [activeTransaction, isValidActiveTx])
 
   const getStatusIcon = () => {
     if (!isValidActiveTx) return Clock
