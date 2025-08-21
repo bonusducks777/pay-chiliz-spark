@@ -1,7 +1,23 @@
 import { useState } from 'react'
 import * as React from 'react'
 import { motion } from 'framer-motion'
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
+  // Get contract balance
+  const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getContractBalance',
+    query: { refetchInterval: 5000 },
+  })
+
+  // Clear active transaction
+  const handleClearActiveTransaction = () => {
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'clearActiveTransaction',
+    } as any)
+  }
 import { parseEther } from 'viem'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -120,6 +136,13 @@ export const AdminPanel = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Contract Balance */}
+            <div className="space-y-2">
+              <Label>Contract Balance</Label>
+              <div className="font-mono text-lg text-primary">
+                {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (CHZ)</Label>
               <Input
@@ -173,6 +196,14 @@ export const AdminPanel = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+              <Button 
+                variant="outline" 
+                onClick={handleClearActiveTransaction}
+                disabled={isPending || isConfirming}
+                className="w-full mb-2"
+              >
+                Clear Active Transaction
+              </Button>
             <Button 
               variant="destructive" 
               onClick={handleCancelTransaction}

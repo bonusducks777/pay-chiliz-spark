@@ -10,52 +10,31 @@ export const TransactionStatus = () => {
   const { data: activeTransaction, refetch } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: 'getActiveTransaction',
+    functionName: 'getActiveTransactionFields',
     query: {
       refetchInterval: 2000, // Refetch every 2 seconds for real-time updates
     }
   })
 
-  // Debug log to see what we're getting
-  console.log('TransactionStatus - activeTransaction data:', activeTransaction)
+  // Helper: is valid struct
+  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 7 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
 
   const getStatusIcon = () => {
-    console.log('getStatusIcon - activeTransaction:', activeTransaction)
-    if (!activeTransaction) {
-      console.log('No activeTransaction data')
-      return Clock
-    }
-    
-    // Check if transaction exists (id > 0 and amount > 0)
-    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
-    console.log('hasValidTransaction:', hasValidTransaction, 'id:', activeTransaction[0]?.toString(), 'amount:', activeTransaction[1]?.toString())
-    
-    if (!hasValidTransaction) return Clock
-    if (activeTransaction[6]) {
-      console.log('Transaction cancelled')
-      return XCircle // cancelled
-    }
-    if (activeTransaction[3]) {
-      console.log('Transaction paid')
-      return CheckCircle // paid
-    }
-    console.log('Transaction pending')
+    if (!isValidActiveTx) return Clock
+    if (activeTransaction[6]) return XCircle // cancelled
+    if (activeTransaction[3]) return CheckCircle // paid
     return Activity // pending
   }
 
   const getStatusColor = () => {
-    if (!activeTransaction) return 'secondary'
-    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
-    if (!hasValidTransaction) return 'secondary'
+    if (!isValidActiveTx) return 'secondary'
     if (activeTransaction[6]) return 'destructive'
     if (activeTransaction[3]) return 'default'
     return 'default'
   }
 
   const getStatusText = () => {
-    if (!activeTransaction) return 'No Active Transaction'
-    const hasValidTransaction = activeTransaction[0] > 0n && activeTransaction[1] > 0n
-    if (!hasValidTransaction) return 'No Active Transaction'
+    if (!isValidActiveTx) return 'No Active Transaction'
     if (activeTransaction[6]) return 'Cancelled'
     if (activeTransaction[3]) return 'Paid'
     return 'Awaiting Payment'
@@ -77,7 +56,7 @@ export const TransactionStatus = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {activeTransaction && activeTransaction[0] > 0n && activeTransaction[1] > 0n ? (
+          {isValidActiveTx ? (
             <>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
@@ -113,7 +92,7 @@ export const TransactionStatus = () => {
                 </span>
               </div>
 
-              {activeTransaction[3] && activeTransaction[2] !== '0x0000000000000000000000000000000000000000' && (
+              {activeTransaction[3] && typeof activeTransaction[2] === 'string' && activeTransaction[2] !== '0x0000000000000000000000000000000000000000' && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Paid by</span>
                   <span className="font-mono text-xs">

@@ -1,3 +1,4 @@
+import React from 'react';
 import { useReadContract } from 'wagmi'
 import { formatEther } from 'viem'
 import { motion } from 'framer-motion'
@@ -8,17 +9,28 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
 import { History, CheckCircle, XCircle } from 'lucide-react'
 
 export const RecentTransactions = () => {
-  const { data: recentTransactions, refetch } = useReadContract({
+  // Use new getAllRecentTransactions for efficient loading
+  const { data: allTxData } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: 'getRecentTransactions',
-    query: {
-      refetchInterval: 3000, // Refetch every 3 seconds for real-time updates
-    }
+    functionName: 'getAllRecentTransactions',
+    query: { refetchInterval: 3000 },
   })
 
-  // Debug logging
-  console.log('RecentTransactions - data:', recentTransactions)
+  // allTxData is a tuple of arrays: [ids, amounts, payers, paids, timestamps, descriptions, cancelleds]
+  const recentTransactions = React.useMemo(() => {
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) return [];
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData;
+    return ids.map((id: any, i: number) => [
+      id,
+      amounts[i],
+      payers[i],
+      paids[i],
+      timestamps[i],
+      descriptions[i],
+      cancelleds[i],
+    ]);
+  }, [allTxData]);
 
   return (
     <motion.div
@@ -47,16 +59,16 @@ export const RecentTransactions = () => {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                        {tx[6] ? ( // cancelled
+                        {tx[6] ? (
                           <XCircle className="w-4 h-4 text-destructive" />
-                        ) : tx[3] ? ( // paid
+                        ) : tx[3] ? (
                           <CheckCircle className="w-4 h-4 text-primary" />
                         ) : null}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm">#{tx[0].toString()}</span>
-                          <Badge 
+                          <Badge
                             variant={tx[6] ? 'destructive' : tx[3] ? 'default' : 'secondary'}
                             className="text-xs"
                           >

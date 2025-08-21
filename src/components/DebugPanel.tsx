@@ -1,5 +1,38 @@
-import { useState } from 'react'
-import { useReadContract } from 'wagmi'
+import React, { useState } from 'react'
+import { useReadContract, useWriteContract } from 'wagmi'
+  // Contract balance
+  const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getContractBalance',
+    query: { refetchInterval: 5000 },
+  })
+
+  // All recent transactions (tuple arrays)
+  const { data: allTxData } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getAllRecentTransactions',
+    query: { refetchInterval: 5000 },
+  })
+
+  const allRecentTransactions = React.useMemo(() => {
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) return [];
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData;
+    return ids.map((id: any, i: number) => [
+      id, amounts[i], payers[i], paids[i], timestamps[i], descriptions[i], cancelleds[i],
+    ]);
+  }, [allTxData]);
+
+  // Write contract for clearActiveTransaction
+  const { writeContract } = useWriteContract();
+  const handleClearActiveTransaction = () => {
+    writeContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'clearActiveTransaction',
+    } as any)
+  }
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,14 +65,48 @@ export const DebugPanel = () => {
   const { data: activeTransaction, refetch: refetchActiveTransaction } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: 'getActiveTransaction',
+    functionName: 'getActiveTransactionFields',
   })
 
-  const { data: recentTransactions, refetch: refetchRecentTransactions } = useReadContract({
+  const { data: txCount } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: 'getRecentTransactions',
+    functionName: 'getRecentTransactionsCount',
   })
+
+  // Fetch each transaction by index
+  const txIndices = txCount && typeof txCount === 'bigint' ? Array.from({ length: Number(txCount) }, (_, i) => i) : [];
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function fetchAll() {
+      if (!txIndices.length) {
+        setRecentTransactions([]);
+        return;
+      }
+      const results = await Promise.all(
+        txIndices.map(async (i) => {
+          try {
+            const res = await window.ethereum.request({
+              method: 'eth_call',
+              params: [{
+                to: CONTRACT_ADDRESS,
+                data: (window as any).wagmiConfig.contracts[CONTRACT_ADDRESS].interface.encodeFunctionData('getRecentTransactionFields', [i])
+              }, 'latest']
+            });
+            // decode result
+            return (window as any).wagmiConfig.contracts[CONTRACT_ADDRESS].interface.decodeFunctionResult('getRecentTransactionFields', res);
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (!cancelled) setRecentTransactions(results.filter(Boolean));
+    }
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [txIndices.length, CONTRACT_ADDRESS]);
 
   const { data: paymentStatus, refetch: refetchPaymentStatus } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -63,7 +130,7 @@ export const DebugPanel = () => {
     refetchTxCounter()
     refetchMaxRecentTx()
     refetchActiveTransaction()
-    refetchRecentTransactions()
+  // refetchRecentTransactions() // removed, no longer used
     refetchPaymentStatus()
   }
 
@@ -72,8 +139,8 @@ export const DebugPanel = () => {
     { name: 'txCounter', description: 'Total transaction counter', data: txCounter },
     { name: 'MAX_RECENT_TX', description: 'Maximum recent transactions stored', data: maxRecentTx },
     { name: 'activeTransaction', description: 'Current active transaction details', data: activeTransaction },
-    { name: 'recentTransactions', description: 'Array of recent transactions', data: recentTransactions },
     { name: 'paymentStatus', description: 'Payment status of active transaction', data: paymentStatus },
+    { name: 'contractBalance', description: 'Current contract balance (CHZ)', data: contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ' },
   ]
 
   const readFunctions = [
@@ -153,7 +220,43 @@ export const DebugPanel = () => {
                       </div>
                     </div>
                   ))}
+                  {/* Button to clear active transaction */}
+                  <Button onClick={handleClearActiveTransaction} variant="outline" className="mt-2 w-full">
+                    Clear Active Transaction
+                  </Button>
                 </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+          {/* All Recent Transactions Table */}
+          <Card className="shadow-card bg-gradient-card border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                All Recent Transactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px] pr-4">
+                {allRecentTransactions.length > 0 ? (
+                  <div className="space-y-2">
+                    {[...allRecentTransactions].reverse().map((tx, idx) => (
+                      <div key={tx[0].toString()} className="flex items-center justify-between p-2 rounded bg-secondary/30 border border-border/50">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs">#{tx[0].toString()}</span>
+                          <Badge variant={tx[6] ? 'destructive' : tx[3] ? 'default' : 'secondary'} className="text-xs">
+                            {tx[6] ? 'Cancelled' : tx[3] ? 'Paid' : 'Pending'}
+                          </Badge>
+                        </div>
+                        <span className="font-mono text-xs">{tx[5]}</span>
+                        <span className="font-mono text-xs">{Number(tx[1]) / 1e18} CHZ</span>
+                        <span className="font-mono text-xs">{new Date(Number(tx[4]) * 1000).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-xs text-muted-foreground">No recent transactions</div>
+                )}
               </ScrollArea>
             </CardContent>
           </Card>

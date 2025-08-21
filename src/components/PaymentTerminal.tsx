@@ -48,6 +48,9 @@ export const PaymentTerminal = () => {
               <p className="text-muted-foreground font-mono text-sm">
                 {CONTRACT_ADDRESS}
               </p>
+              <p className="text-xs text-muted-foreground font-mono mt-1">
+                Project ID: facd1356da9a88af48c3e1821f0d92cf
+              </p>
             </div>
           </div>
           <ConnectButton />
