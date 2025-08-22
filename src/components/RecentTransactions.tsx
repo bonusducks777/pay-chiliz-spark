@@ -5,13 +5,14 @@ import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
 
 export const RecentTransactions = () => {
   const chainId = useChainId();
   const contractAddress = CONTRACTS[chainId] as `0x${string}`;
+  const supportedTokens = getSupportedTokens(chainId);
   // Use new getAllRecentTransactions for efficient loading
   const { data: allTxData } = useReadContract({
     address: contractAddress,
@@ -27,13 +28,11 @@ export const RecentTransactions = () => {
       return []
     }
 
-    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists] = allTxData
-    
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists, requestedTokenContracts] = allTxData
     if (!Array.isArray(ids) || ids.length === 0) {
       console.log('RecentTransactions - No transactions found')
       return []
     }
-
     const transactions = ids.map((id, index) => ({
       id: id,
       amount: amounts[index],
@@ -44,7 +43,8 @@ export const RecentTransactions = () => {
       cancelled: cancelleds[index],
       merchantName: merchantNames[index],
       merchantLocation: merchantLocations[index],
-      itemizedList: itemizedLists[index]
+      itemizedList: itemizedLists[index],
+      requestedTokenContract: requestedTokenContracts[index],
     }))
 
     console.log('RecentTransactions - Parsed transactions:', transactions)
@@ -109,30 +109,44 @@ export const RecentTransactions = () => {
                           </p>
                         )}
                         {tx.itemizedList && (
-                          <ul className="text-[10px] text-muted-foreground/80 list-disc pl-4">
+                          <div className="text-[10px] text-muted-foreground/80 mt-1">
                             {(() => {
                               try {
                                 const items = JSON.parse(tx.itemizedList)
                                 if (Array.isArray(items) && items.length > 0) {
-                                  return items.map((item, idx) => (
-                                    <li key={idx}>
-                                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
-                                    </li>
-                                  ))
+                                  return (
+                                    <div className="space-y-1">
+                                      <div className="grid grid-cols-[1fr_40px_60px] gap-1 font-semibold border-b pb-1">
+                                        <span>Item</span>
+                                        <span className="text-center">Qty</span>
+                                        <span className="text-center">Amount</span>
+                                      </div>
+                                      {items.map((item, idx) => (
+                                        <div key={idx} className="grid grid-cols-[1fr_40px_60px] gap-1">
+                                          <span className="font-semibold truncate">{item.name}</span>
+                                          <span className="text-center">{item.quantity}</span>
+                                          <span className="text-center font-mono">{item.value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
                                 }
-                                return <li className="text-muted-foreground">No items</li>
+                                return <div className="text-muted-foreground">No items</div>
                               } catch {
-                                return <li className="text-destructive">Invalid itemized list</li>
+                                return <div className="text-destructive">Invalid itemized list</div>
                               }
                             })()}
-                          </ul>
+                          </div>
                         )}
                       </div>
                     </div>
 
                     <div className="text-right">
                       <div className="font-mono text-sm text-primary">
-                        {formatEther(tx.amount)} CHZ
+                        {formatEther(tx.amount)} {(() => {
+                          const token = supportedTokens.find(t => t.address.toLowerCase() === String(tx.requestedTokenContract).toLowerCase());
+                          return token ? token.symbol : 'TOKEN';
+                        })()}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(Number(tx.timestamp) * 1000).toLocaleDateString()}

@@ -30,11 +30,11 @@ export const DebugPanel = () => {
   })
 
   const allRecentTransactions = React.useMemo(() => {
-    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 10) return [];
-    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists] = allTxData;
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 11) return []; // Updated for ERC20 contract (11 fields)
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists, requestedTokenContracts] = allTxData;
     return ids.map((id: any, i: number) => [
       id, amounts[i], payers[i], paids[i], timestamps[i], descriptions[i], cancelleds[i],
-      merchantNames[i], merchantLocations[i], itemizedLists[i]
+      merchantNames[i], merchantLocations[i], itemizedLists[i], requestedTokenContracts[i] // Added requestedTokenContract
     ]);
   }, [allTxData]);
 

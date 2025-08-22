@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { CONTRACTS, CONTRACT_ABI, getCurrencySymbol } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { useToast } from '@/hooks/use-toast'
 import { useMerchantInfo } from '@/hooks/use-merchant-info'
@@ -23,20 +23,49 @@ export const AdminPanel = () => {
   const [itemizedItems, setItemizedItems] = useState<{ name: string; quantity: string; value: string }[]>([])
   const [newItem, setNewItem] = useState({ name: '', quantity: '1', value: '' })
   const [withdrawAddress, setWithdrawAddress] = useState('')
+  const supportedTokens = getSupportedTokens(chainId);
+  const [selectedToken, setSelectedToken] = useState(supportedTokens[0]);
+  const [requestedTokenContract, setRequestedTokenContract] = useState(supportedTokens[0].address);
   const { toast } = useToast()
   const { merchantInfo, updateMerchantInfo } = useMerchantInfo()
 
-  // Get contract balance
-  const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
+  // Reset selected token when chain changes
+  React.useEffect(() => {
+    const newSupportedTokens = getSupportedTokens(chainId);
+    setSelectedToken(newSupportedTokens[0]); // Always default to native token
+    setRequestedTokenContract(newSupportedTokens[0].address);
+  }, [chainId]);
+
+  // Get active transaction state
+  const { data: activeTransaction, refetch: refetchActive } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
-    functionName: 'getContractBalance',
-    query: { refetchInterval: 5000 },
-  })
+    functionName: 'getActiveTransactionFields',
+    query: {
+      refetchInterval: 3000, // Refetch every 3 seconds
+    }
+  });
+
+  // Helper: check if there's a valid active transaction
+  const hasActiveTransaction = Array.isArray(activeTransaction) && activeTransaction.length >= 11 && activeTransaction[0] > 0n;
+  const isTransactionPaid = hasActiveTransaction && activeTransaction[3];
+  const isTransactionCancelled = hasActiveTransaction && activeTransaction[6];
+  const canCreateNewTransaction = !hasActiveTransaction || isTransactionPaid || isTransactionCancelled;
+  const canCancelTransaction = hasActiveTransaction && !isTransactionPaid && !isTransactionCancelled;
+
+  // Get contract balances for all supported tokens
+  const balances = supportedTokens.map(token => {
+    const { data } = useReadContract({
+      address: contractAddress,
+      abi: CONTRACT_ABI,
+      functionName: 'getContractBalance',
+      args: [token.address],
+      query: { refetchInterval: 5000 },
+    });
+    return { ...token, balance: data };
+  });
 
   // Auto-calculate amount from itemizedItems
-  // Get current currency symbol
-  const [currency, setCurrency] = useState(getCurrencySymbol())
   React.useEffect(() => {
     if (itemizedItems.length > 0) {
       const total = itemizedItems.reduce((sum, item) => {
@@ -44,14 +73,18 @@ export const AdminPanel = () => {
         const val = parseFloat(item.value) || 0;
         return sum + qty * val;
       }, 0);
-      setAmount(total ? total.toFixed(2) : '');
+      setAmount(total ? total.toFixed(selectedToken.decimals) : '');
     } else {
       setAmount('');
     }
-  }, [itemizedItems]);
+  }, [itemizedItems, selectedToken]);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract({
     mutation: {
+      onSuccess: () => {
+        // Refresh active transaction state after successful operation
+        setTimeout(() => refetchActive(), 1000);
+      },
       onError: (error) => {
         toast({
           title: "Transaction Failed",
@@ -78,15 +111,16 @@ export const AdminPanel = () => {
   }, [isSuccess, hash, toast])
 
   const handleSetTransaction = async () => {
-    console.log('handleSetTransaction called with:', { 
-      amount, 
-      description, 
-      merchantName: merchantInfo.name, 
-      merchantLocation: merchantInfo.location, 
-      itemizedList: JSON.stringify(itemizedItems) 
-    })
+    if (!canCreateNewTransaction) {
+      toast({
+        title: "Cannot Create Transaction",
+        description: "Please complete or cancel the current active transaction first",
+        variant: "destructive"
+      })
+      return
+    }
+    
     if (!amount || !description || !merchantInfo.name || !merchantInfo.location) {
-      console.log('Missing required fields')
       toast({
         title: "Error",
         description: "Please fill in all required fields (amount, description, merchant name, and location)",
@@ -94,7 +128,6 @@ export const AdminPanel = () => {
       })
       return
     }
-    // Validate itemizedItems is valid JSON array
     let itemizedListJson = '[]'
     try {
       itemizedListJson = JSON.stringify(itemizedItems)
@@ -106,21 +139,35 @@ export const AdminPanel = () => {
       })
       return
     }
-    console.log('Setting active transaction...')
     writeContract({
       address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'setActiveTransaction',
-      args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedListJson],
+      args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedListJson, selectedToken.address],
     } as any)
-  setAmount('')
-  setDescription('')
-  setItemizedItems([])
-  setNewItem({ name: '', quantity: '', value: '' })
+    setAmount('')
+    setDescription('')
+    setItemizedItems([])
+    setNewItem({ name: '', quantity: '', value: '' })
+    setSelectedToken(supportedTokens[0])
   }
 
   const handleCancelTransaction = () => {
     console.log('handleCancelTransaction called')
+    
+    if (!canCancelTransaction) {
+      toast({
+        title: "Cannot Cancel Transaction",
+        description: !hasActiveTransaction 
+          ? "No active transaction to cancel" 
+          : isTransactionPaid 
+            ? "Cannot cancel a paid transaction" 
+            : "Transaction is already cancelled",
+        variant: "destructive"
+      })
+      return
+    }
+    
     writeContract({
       address: contractAddress,
       abi: CONTRACT_ABI,
@@ -142,11 +189,12 @@ export const AdminPanel = () => {
     }
 
     console.log('Initiating withdrawal...')
+    // PaymentTerminalERC20 withdraw requires tokenContract parameter
     writeContract({
       address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'withdraw',
-      args: [withdrawAddress as `0x${string}`],
+      args: [withdrawAddress as `0x${string}`, selectedToken.address], // Use selected token
     } as any)
     
     setWithdrawAddress('')
@@ -163,11 +211,31 @@ export const AdminPanel = () => {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <div>
+      {/* Transaction Status Indicator */}
+      {hasActiveTransaction && (
+        <Card className="shadow-card bg-gradient-card border-border/50 mb-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${isTransactionPaid ? 'bg-green-500' : isTransactionCancelled ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
+              <div>
+                <span className="font-semibold">
+                  {isTransactionPaid ? 'Transaction Completed' : isTransactionCancelled ? 'Transaction Cancelled' : 'Active Transaction'}
+                </span>
+                <span className="text-sm text-muted-foreground ml-2">
+                  ID #{activeTransaction[0].toString()}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Merchant Settings (1/3 width) */}
         <Card className="shadow-card bg-gradient-card border-border/50">
@@ -214,17 +282,39 @@ export const AdminPanel = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount ({currency}) *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.001"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`0.000 ${currency}`}
-                className="font-mono"
-                readOnly
-              />
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label htmlFor="amount">Amount *</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.001"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Amount"
+                    className="font-mono"
+                    readOnly={itemizedItems.length > 0}
+                  />
+                </div>
+                <div className="min-w-[100px]">
+                  <Label htmlFor="currency">Currency</Label>
+                  <select
+                    id="currency"
+                    className="w-full h-[40px] px-3 py-2 border border-input bg-background rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors shadow-sm"
+                    value={selectedToken.shortcode}
+                    onChange={e => {
+                      const token = supportedTokens.find(t => t.shortcode === e.target.value);
+                      if (token) {
+                        setSelectedToken(token);
+                      }
+                    }}
+                  >
+                    {supportedTokens.map(token => (
+                      <option key={token.shortcode} value={token.shortcode}>{token.symbol}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description *</Label>
@@ -238,33 +328,39 @@ export const AdminPanel = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="itemizedList">Itemized List</Label>
-              <div className="flex gap-2 flex-wrap">
-                <Input
-                  id="itemName"
-                  value={newItem.name}
-                  onChange={e => setNewItem({ ...newItem, name: e.target.value })}
-                  placeholder="Item name"
-                  className="w-32"
-                />
-                <Input
-                  id="itemQty"
-                  value={newItem.quantity}
-                  onChange={e => setNewItem({ ...newItem, quantity: e.target.value })}
-                  placeholder="Qty"
-                  className="w-16"
-                  type="number"
-                  min="1"
-                />
-                <Input
-                  id="itemValue"
-                  value={newItem.value}
-                  onChange={e => setNewItem({ ...newItem, value: e.target.value })}
-                  placeholder={`Value (${currency})`}
-                  className="w-24"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                />
+              <div className="grid grid-cols-[1fr_80px_100px_80px] gap-2 items-end">
+                <div>
+                  <Label htmlFor="itemName">Item Name</Label>
+                  <Input
+                    id="itemName"
+                    value={newItem.name}
+                    onChange={e => setNewItem({ ...newItem, name: e.target.value })}
+                    placeholder="Item name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="itemQty">Qty</Label>
+                  <Input
+                    id="itemQty"
+                    value={newItem.quantity}
+                    onChange={e => setNewItem({ ...newItem, quantity: e.target.value })}
+                    placeholder="Qty"
+                    type="number"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="itemValue">Amount</Label>
+                  <Input
+                    id="itemValue"
+                    value={newItem.value}
+                    onChange={e => setNewItem({ ...newItem, value: e.target.value })}
+                    placeholder="Amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
                 <Button
                   type="button"
                   onClick={() => {
@@ -276,32 +372,39 @@ export const AdminPanel = () => {
                   size="sm"
                 >Add</Button>
               </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {itemizedItems.map((item, idx) => (
-                  <li key={idx} className="flex items-center justify-between gap-2">
-                    <span>
-                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value} {currency}</span>
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setItemizedItems(itemizedItems.filter((_, i) => i !== idx))}
-                    >Remove</Button>
-                  </li>
-                ))}
-              </ul>
+              {itemizedItems.length > 0 && (
+                <div className="space-y-1">
+                  {itemizedItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_80px_100px_80px] gap-2 items-center p-2 bg-secondary/20 rounded border">
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-center">{item.quantity}</span>
+                      <span className="text-center font-mono">{item.value} {selectedToken.symbol}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setItemizedItems(itemizedItems.filter((_, i) => i !== idx))}
+                      >Remove</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="text-xs text-muted-foreground">Items will be saved as a JSON list of objects (name, quantity, value)</div>
             </div>
             <Button 
               onClick={handleSetTransaction}
-              disabled={isPending || isConfirming || !merchantInfo.name || !merchantInfo.location}
+              disabled={isPending || isConfirming || !merchantInfo.name || !merchantInfo.location || !canCreateNewTransaction}
               className="w-full"
             >
               {isPending || isConfirming ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creating...
+                </>
+              ) : !canCreateNewTransaction ? (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Active Transaction Exists
                 </>
               ) : (
                 <>
@@ -323,9 +426,13 @@ export const AdminPanel = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Contract Balance</Label>
-              <div className="font-mono text-lg text-primary">
-                {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
+              <Label>Contract Balances</Label>
+              <div className="flex flex-wrap gap-2">
+                {balances.map(token => (
+                  <div key={token.shortcode} className="font-mono text-lg text-primary border rounded px-2 py-1 bg-secondary/30">
+                    {token.balance ? (Number(token.balance) / 10 ** token.decimals).toFixed(4) : '0.0000'} {token.symbol}
+                  </div>
+                ))}
               </div>
             </div>
             <Button 
@@ -346,13 +453,18 @@ export const AdminPanel = () => {
             <Button 
               variant="destructive" 
               onClick={handleCancelTransaction}
-              disabled={isPending || isConfirming}
+              disabled={isPending || isConfirming || !canCancelTransaction}
               className="w-full"
             >
               {isPending || isConfirming ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Cancelling...
+                </>
+              ) : !canCancelTransaction ? (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  {!hasActiveTransaction ? 'No Active Transaction' : isTransactionPaid ? 'Transaction Already Paid' : 'Transaction Already Cancelled'}
                 </>
               ) : (
                 <>
@@ -407,5 +519,6 @@ export const AdminPanel = () => {
         </CardContent>
       </Card>
     </motion.div>
+    </div>
   )
 }

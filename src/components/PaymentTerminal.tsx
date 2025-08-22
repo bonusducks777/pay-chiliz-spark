@@ -9,6 +9,7 @@ import { UserPanel } from './UserPanel'
 import { TransactionStatus } from './TransactionStatus'
 import { RecentTransactions } from './RecentTransactions'
 import { DebugPanel } from './DebugPanel'
+import { QRCodeGenerator } from './QRCodeGenerator'
 import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 
@@ -26,7 +27,7 @@ export const PaymentTerminal = () => {
     abi: CONTRACT_ABI,
     functionName: 'owner',
   })
-  const isOwner = owner && address && owner.toLowerCase() === address.toLowerCase()
+  const isOwner = owner && address && (typeof owner === 'string') && owner.toLowerCase() === address.toLowerCase()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-terminal-bg to-background">
@@ -109,6 +110,100 @@ export const PaymentTerminal = () => {
                   <TransactionStatus />
                   <RecentTransactions />
                 </div>
+                
+                {/* Payment Instructions */}
+                <Card className="shadow-card bg-gradient-card border-border/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Terminal className="w-5 h-5 text-primary" />
+                      Payment Instructions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                      {/* Tap to Pay Instructions */}
+                      <div className="lg:col-span-2 space-y-4">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-bold">1</span>
+                          </div>
+                          <h3 className="font-semibold text-lg">How to Pay</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                                <span className="text-xs font-semibold text-primary">1</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">Connect Wallet</p>
+                                <p className="text-sm text-muted-foreground">Use the "Connect Wallet" button above</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                                <span className="text-xs font-semibold text-primary">2</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">Navigate to Pay Tab</p>
+                                <p className="text-sm text-muted-foreground">Click the "Pay" tab above</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                                <span className="text-xs font-semibold text-primary">3</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">Review Payment</p>
+                                <p className="text-sm text-muted-foreground">Check the transaction details</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center mt-0.5">
+                                <span className="text-xs font-semibold text-primary">4</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">Complete Payment</p>
+                                <p className="text-sm text-muted-foreground">Approve transaction in your wallet</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* QR Code */}
+                      <div className="flex flex-col items-center space-y-4 lg:col-span-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-primary font-bold">2</span>
+                          </div>
+                          <h3 className="font-semibold text-lg">QR Code</h3>
+                        </div>
+                        
+                        <div className="p-6 bg-white rounded-xl shadow-sm border">
+                          <QRCodeGenerator 
+                            chainId={chainId}
+                            contractAddress={contractAddress}
+                            size={160}
+                          />
+                        </div>
+                        
+                        <div className="text-center space-y-1">
+                          <p className="text-sm font-medium">Scan for Contract Info</p>
+                          <p className="text-xs text-muted-foreground">
+                            Contains chain & contract address
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {isOwner && (

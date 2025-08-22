@@ -4,12 +4,13 @@ import { formatEther } from 'viem'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
 import { Activity, CheckCircle, XCircle, Clock } from 'lucide-react'
 
 export const TransactionStatus = () => {
   const chainId = useChainId();
   const contractAddress = CONTRACTS[chainId] as `0x${string}`;
+  const supportedTokens = getSupportedTokens(chainId);
   const { data: activeTransaction, refetch } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
@@ -19,8 +20,8 @@ export const TransactionStatus = () => {
     }
   })
 
-  // Helper: is valid struct (now expects 10 fields instead of 7)
-  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 10 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
+  // Helper: is valid struct (now expects 11 fields for ERC20)
+  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 11 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
 
   // Debug logging
   React.useEffect(() => {
@@ -97,7 +98,10 @@ export const TransactionStatus = () => {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Amount</span>
                 <span className="font-mono text-xl text-primary animate-glow">
-                  {formatEther(activeTransaction[1])} CHZ
+                  {formatEther(activeTransaction[1])} {(() => {
+                    const token = supportedTokens.find(t => t.address.toLowerCase() === String(activeTransaction[10]).toLowerCase());
+                    return token ? token.symbol : 'TOKEN';
+                  })()}
                 </span>
               </div>
 
@@ -125,23 +129,34 @@ export const TransactionStatus = () => {
               {activeTransaction[9] && (
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Items</span>
-                  <ul className="text-xs bg-secondary/50 p-3 rounded-md border border-border/50 whitespace-pre-wrap list-disc pl-5">
+                  <div className="text-xs">
                     {(() => {
                       try {
                         const items = JSON.parse(activeTransaction[9])
                         if (Array.isArray(items) && items.length > 0) {
-                          return items.map((item, idx) => (
-                            <li key={idx}>
-                              <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
-                            </li>
-                          ))
+                          return (
+                            <div className="space-y-1">
+                              <div className="grid grid-cols-[2fr_1fr_1fr] gap-2 p-2 font-semibold text-[11px] text-muted-foreground border-b">
+                                <span>Item Name</span>
+                                <span className="text-center">Quantity</span>
+                                <span className="text-center">Price</span>
+                              </div>
+                              {items.map((item, idx) => (
+                                <div key={idx} className="grid grid-cols-[2fr_1fr_1fr] gap-2 p-2 text-[10px] hover:bg-muted/20 transition-colors rounded">
+                                  <span className="font-medium truncate" title={item.name}>{item.name}</span>
+                                  <span className="text-center font-mono">{item.quantity}</span>
+                                  <span className="text-center font-mono">{item.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
                         }
-                        return <li className="text-muted-foreground">No items</li>
+                        return <div className="text-muted-foreground text-center py-2">No items specified</div>
                       } catch {
-                        return <li className="text-destructive">Invalid itemized list</li>
+                        return <div className="text-destructive text-center py-2">Invalid itemized list format</div>
                       }
                     })()}
-                  </ul>
+                  </div>
                 </div>
               )}
 
