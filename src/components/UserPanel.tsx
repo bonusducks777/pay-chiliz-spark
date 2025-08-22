@@ -29,8 +29,8 @@ export const UserPanel = () => {
     }
   })
 
-  // Helper: is valid struct
-  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 7 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
+  // Helper: is valid struct (now expects 10 fields instead of 7)
+  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 10 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
 
   const { writeContract, data: hash, isPending, error } = useWriteContract({
     mutation: {
@@ -143,6 +143,29 @@ export const UserPanel = () => {
                   <span className="text-sm text-muted-foreground">Description</span>
                   <span className="text-right max-w-48 truncate">{activeTransaction[5]}</span>
                 </div>
+                
+                {activeTransaction[7] && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Merchant</span>
+                    <span className="text-right max-w-48 truncate">{activeTransaction[7]}</span>
+                  </div>
+                )}
+                
+                {activeTransaction[8] && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Location</span>
+                    <span className="text-right max-w-48 truncate">{activeTransaction[8]}</span>
+                  </div>
+                )}
+                
+                {activeTransaction[9] && (
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Items</span>
+                    <pre className="text-xs bg-secondary/50 p-2 rounded border border-border/50 whitespace-pre-wrap max-h-20 overflow-y-auto">
+                      {activeTransaction[9]}
+                    </pre>
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>

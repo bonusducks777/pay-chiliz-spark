@@ -19,12 +19,12 @@ export const RecentTransactions = () => {
 
   // Parse the transaction data from the new contract format
   const recentTransactions = React.useMemo(() => {
-    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) {
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 10) {
       console.log('RecentTransactions - No valid data:', allTxData)
       return []
     }
 
-    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists] = allTxData
     
     if (!Array.isArray(ids) || ids.length === 0) {
       console.log('RecentTransactions - No transactions found')
@@ -38,7 +38,10 @@ export const RecentTransactions = () => {
       paid: paids[index],
       timestamp: timestamps[index],
       description: descriptions[index],
-      cancelled: cancelleds[index]
+      cancelled: cancelleds[index],
+      merchantName: merchantNames[index],
+      merchantLocation: merchantLocations[index],
+      itemizedList: itemizedLists[index]
     }))
 
     console.log('RecentTransactions - Parsed transactions:', transactions)
@@ -84,7 +87,7 @@ export const RecentTransactions = () => {
                           <Clock className="w-4 h-4 text-muted-foreground" />
                         )}
                       </div>
-                      <div>
+                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm">#{tx.id.toString()}</span>
                           <Badge
@@ -97,6 +100,11 @@ export const RecentTransactions = () => {
                         <p className="text-xs text-muted-foreground truncate max-w-32">
                           {tx.description}
                         </p>
+                        {tx.merchantName && (
+                          <p className="text-xs text-muted-foreground/80 truncate max-w-32">
+                            {tx.merchantName}
+                          </p>
+                        )}
                       </div>
                     </div>
 

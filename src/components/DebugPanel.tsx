@@ -27,10 +27,11 @@ export const DebugPanel = () => {
   })
 
   const allRecentTransactions = React.useMemo(() => {
-    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 7) return [];
-    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds] = allTxData;
+    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 10) return [];
+    const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists] = allTxData;
     return ids.map((id: any, i: number) => [
       id, amounts[i], payers[i], paids[i], timestamps[i], descriptions[i], cancelleds[i],
+      merchantNames[i], merchantLocations[i], itemizedLists[i]
     ]);
   }, [allTxData]);
 

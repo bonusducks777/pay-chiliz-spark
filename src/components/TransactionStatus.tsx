@@ -17,8 +17,8 @@ export const TransactionStatus = () => {
     }
   })
 
-  // Helper: is valid struct
-  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 7 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
+  // Helper: is valid struct (now expects 10 fields instead of 7)
+  const isValidActiveTx = Array.isArray(activeTransaction) && activeTransaction.length >= 10 && typeof activeTransaction[0] !== 'undefined' && typeof activeTransaction[1] !== 'undefined' && activeTransaction[0] > 0n && activeTransaction[1] > 0n
 
   // Debug logging
   React.useEffect(() => {
@@ -32,7 +32,10 @@ export const TransactionStatus = () => {
         paid: activeTransaction[3],
         timestamp: activeTransaction[4].toString(),
         description: activeTransaction[5],
-        cancelled: activeTransaction[6]
+        cancelled: activeTransaction[6],
+        merchantName: activeTransaction[7],
+        merchantLocation: activeTransaction[8],
+        itemizedList: activeTransaction[9]
       })
     }
   }, [activeTransaction, isValidActiveTx])
@@ -102,6 +105,29 @@ export const TransactionStatus = () => {
                   {activeTransaction[5]}
                 </p>
               </div>
+
+              {activeTransaction[7] && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Merchant</span>
+                  <span className="text-sm font-medium">{activeTransaction[7]}</span>
+                </div>
+              )}
+
+              {activeTransaction[8] && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Location</span>
+                  <span className="text-sm">{activeTransaction[8]}</span>
+                </div>
+              )}
+
+              {activeTransaction[9] && (
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Items</span>
+                  <pre className="text-xs bg-secondary/50 p-3 rounded-md border border-border/50 whitespace-pre-wrap">
+                    {activeTransaction[9]}
+                  </pre>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Created</span>

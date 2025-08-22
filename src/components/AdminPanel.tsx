@@ -11,13 +11,16 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
 import { useToast } from '@/hooks/use-toast'
-import { Settings, Plus, X, Wallet, Loader2 } from 'lucide-react'
+import { useMerchantInfo } from '@/hooks/use-merchant-info'
+import { Settings, Plus, X, Wallet, Loader2, Store, MapPin } from 'lucide-react'
 
 export const AdminPanel = () => {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
+  const [itemizedList, setItemizedList] = useState('')
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const { toast } = useToast()
+  const { merchantInfo, updateMerchantInfo } = useMerchantInfo()
 
   // Get contract balance
   const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
@@ -55,13 +58,19 @@ export const AdminPanel = () => {
   }, [isSuccess, hash, toast])
 
   const handleSetTransaction = async () => {
-    console.log('handleSetTransaction called with:', { amount, description })
+    console.log('handleSetTransaction called with:', { 
+      amount, 
+      description, 
+      merchantName: merchantInfo.name, 
+      merchantLocation: merchantInfo.location, 
+      itemizedList 
+    })
     
-    if (!amount || !description) {
-      console.log('Missing amount or description')
+    if (!amount || !description || !merchantInfo.name || !merchantInfo.location) {
+      console.log('Missing required fields')
       toast({
         title: "Error",
-        description: "Please fill in all fields",
+        description: "Please fill in all required fields (amount, description, merchant name, and location)",
         variant: "destructive"
       })
       return
@@ -72,11 +81,12 @@ export const AdminPanel = () => {
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
       functionName: 'setActiveTransaction',
-      args: [parseEther(amount), description],
+      args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedList || ''],
     } as any)
     
     setAmount('')
     setDescription('')
+    setItemizedList('')
   }
 
   const handleCancelTransaction = () => {
@@ -128,7 +138,42 @@ export const AdminPanel = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Merchant Settings */}
+        <Card className="shadow-card bg-gradient-card border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="w-5 h-5 text-primary" />
+              Merchant Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="merchantName">Merchant Name *</Label>
+              <Input
+                id="merchantName"
+                value={merchantInfo.name}
+                onChange={(e) => updateMerchantInfo({ name: e.target.value })}
+                placeholder="Your Business Name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="merchantLocation">Location *</Label>
+              <Input
+                id="merchantLocation"
+                value={merchantInfo.location}
+                onChange={(e) => updateMerchantInfo({ location: e.target.value })}
+                placeholder="City, State or Address"
+              />
+            </div>
+            
+            <div className="text-xs text-muted-foreground">
+              Merchant info is saved locally and included in all transactions
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Create Transaction */}
         <Card className="shadow-card bg-gradient-card border-border/50">
           <CardHeader>
@@ -138,15 +183,15 @@ export const AdminPanel = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Contract Balance */}
             <div className="space-y-2">
               <Label>Contract Balance</Label>
               <div className="font-mono text-lg text-primary">
                 {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
               </div>
             </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount (CHZ)</Label>
+              <Label htmlFor="amount">Amount (CHZ) *</Label>
               <Input
                 id="amount"
                 type="number"
@@ -159,19 +204,30 @@ export const AdminPanel = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Payment for..."
+                rows={2}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="itemizedList">Itemized List</Label>
+              <Textarea
+                id="itemizedList"
+                value={itemizedList}
+                onChange={(e) => setItemizedList(e.target.value)}
+                placeholder="1x Coffee - $3.50&#10;1x Muffin - $2.25"
                 rows={3}
               />
             </div>
             
             <Button 
               onClick={handleSetTransaction}
-              disabled={isPending || isConfirming}
+              disabled={isPending || isConfirming || !merchantInfo.name || !merchantInfo.location}
               className="w-full"
             >
               {isPending || isConfirming ? (
