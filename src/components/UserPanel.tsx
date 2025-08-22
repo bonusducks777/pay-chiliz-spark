@@ -161,9 +161,23 @@ export const UserPanel = () => {
                 {activeTransaction[9] && (
                   <div className="space-y-2">
                     <span className="text-sm text-muted-foreground">Items</span>
-                    <pre className="text-xs bg-secondary/50 p-2 rounded border border-border/50 whitespace-pre-wrap max-h-20 overflow-y-auto">
-                      {activeTransaction[9]}
-                    </pre>
+                    <ul className="text-xs bg-secondary/50 p-2 rounded border border-border/50 whitespace-pre-wrap max-h-20 overflow-y-auto list-disc pl-5">
+                      {(() => {
+                        try {
+                          const items = JSON.parse(activeTransaction[9])
+                          if (Array.isArray(items) && items.length > 0) {
+                            return items.map((item, idx) => (
+                              <li key={idx}>
+                                <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                              </li>
+                            ))
+                          }
+                          return <li className="text-muted-foreground">No items</li>
+                        } catch {
+                          return <li className="text-destructive">Invalid itemized list</li>
+                        }
+                      })()}
+                    </ul>
                   </div>
                 )}
                 

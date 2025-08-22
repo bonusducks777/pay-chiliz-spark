@@ -105,6 +105,25 @@ export const RecentTransactions = () => {
                             {tx.merchantName}
                           </p>
                         )}
+                        {tx.itemizedList && (
+                          <ul className="text-[10px] text-muted-foreground/80 list-disc pl-4">
+                            {(() => {
+                              try {
+                                const items = JSON.parse(tx.itemizedList)
+                                if (Array.isArray(items) && items.length > 0) {
+                                  return items.map((item, idx) => (
+                                    <li key={idx}>
+                                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                                    </li>
+                                  ))
+                                }
+                                return <li className="text-muted-foreground">No items</li>
+                              } catch {
+                                return <li className="text-destructive">Invalid itemized list</li>
+                              }
+                            })()}
+                          </ul>
+                        )}
                       </div>
                     </div>
 

@@ -217,6 +217,25 @@ export const DebugPanel = () => {
                         <span className="font-mono text-xs">{tx[5]}</span>
                         <span className="font-mono text-xs">{Number(tx[1]) / 1e18} CHZ</span>
                         <span className="font-mono text-xs">{new Date(Number(tx[4]) * 1000).toLocaleDateString()}</span>
+                        {tx[9] && (
+                          <ul className="text-[10px] text-muted-foreground/80 list-disc pl-4 mt-1">
+                            {(() => {
+                              try {
+                                const items = JSON.parse(tx[9])
+                                if (Array.isArray(items) && items.length > 0) {
+                                  return items.map((item, idx) => (
+                                    <li key={idx}>
+                                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                                    </li>
+                                  ))
+                                }
+                                return <li className="text-muted-foreground">No items</li>
+                              } catch {
+                                return <li className="text-destructive">Invalid itemized list</li>
+                              }
+                            })()}
+                          </ul>
+                        )}
                       </div>
                     ))}
                   </div>

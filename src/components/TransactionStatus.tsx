@@ -123,9 +123,23 @@ export const TransactionStatus = () => {
               {activeTransaction[9] && (
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Items</span>
-                  <pre className="text-xs bg-secondary/50 p-3 rounded-md border border-border/50 whitespace-pre-wrap">
-                    {activeTransaction[9]}
-                  </pre>
+                  <ul className="text-xs bg-secondary/50 p-3 rounded-md border border-border/50 whitespace-pre-wrap list-disc pl-5">
+                    {(() => {
+                      try {
+                        const items = JSON.parse(activeTransaction[9])
+                        if (Array.isArray(items) && items.length > 0) {
+                          return items.map((item, idx) => (
+                            <li key={idx}>
+                              <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                            </li>
+                          ))
+                        }
+                        return <li className="text-muted-foreground">No items</li>
+                      } catch {
+                        return <li className="text-destructive">Invalid itemized list</li>
+                      }
+                    })()}
+                  </ul>
                 </div>
               )}
 

@@ -17,7 +17,8 @@ import { Settings, Plus, X, Wallet, Loader2, Store, MapPin } from 'lucide-react'
 export const AdminPanel = () => {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
-  const [itemizedList, setItemizedList] = useState('')
+  const [itemizedItems, setItemizedItems] = useState<{ name: string; quantity: string; value: string }[]>([])
+  const [newItem, setNewItem] = useState({ name: '', quantity: '', value: '' })
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const { toast } = useToast()
   const { merchantInfo, updateMerchantInfo } = useMerchantInfo()
@@ -63,9 +64,8 @@ export const AdminPanel = () => {
       description, 
       merchantName: merchantInfo.name, 
       merchantLocation: merchantInfo.location, 
-      itemizedList 
+      itemizedList: JSON.stringify(itemizedItems) 
     })
-    
     if (!amount || !description || !merchantInfo.name || !merchantInfo.location) {
       console.log('Missing required fields')
       toast({
@@ -75,18 +75,29 @@ export const AdminPanel = () => {
       })
       return
     }
-
+    // Validate itemizedItems is valid JSON array
+    let itemizedListJson = '[]'
+    try {
+      itemizedListJson = JSON.stringify(itemizedItems)
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to serialize itemized list",
+        variant: "destructive"
+      })
+      return
+    }
     console.log('Setting active transaction...')
     writeContract({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
       functionName: 'setActiveTransaction',
-      args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedList || ''],
+      args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedListJson],
     } as any)
-    
-    setAmount('')
-    setDescription('')
-    setItemizedList('')
+  setAmount('')
+  setDescription('')
+  setItemizedItems([])
+  setNewItem({ name: '', quantity: '', value: '' })
   }
 
   const handleCancelTransaction = () => {
@@ -214,15 +225,63 @@ export const AdminPanel = () => {
               />
             </div>
             
+
             <div className="space-y-2">
               <Label htmlFor="itemizedList">Itemized List</Label>
-              <Textarea
-                id="itemizedList"
-                value={itemizedList}
-                onChange={(e) => setItemizedList(e.target.value)}
-                placeholder="1x Coffee - $3.50&#10;1x Muffin - $2.25"
-                rows={3}
-              />
+              <div className="flex gap-2 flex-wrap">
+                <Input
+                  id="itemName"
+                  value={newItem.name}
+                  onChange={e => setNewItem({ ...newItem, name: e.target.value })}
+                  placeholder="Item name"
+                  className="w-32"
+                />
+                <Input
+                  id="itemQty"
+                  value={newItem.quantity}
+                  onChange={e => setNewItem({ ...newItem, quantity: e.target.value })}
+                  placeholder="Qty"
+                  className="w-16"
+                  type="number"
+                  min="1"
+                />
+                <Input
+                  id="itemValue"
+                  value={newItem.value}
+                  onChange={e => setNewItem({ ...newItem, value: e.target.value })}
+                  placeholder="Value"
+                  className="w-24"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (newItem.name.trim() && newItem.quantity && newItem.value) {
+                      setItemizedItems([...itemizedItems, { ...newItem }])
+                      setNewItem({ name: '', quantity: '', value: '' })
+                    }
+                  }}
+                  size="sm"
+                >Add</Button>
+              </div>
+              <ul className="list-disc pl-5 space-y-1">
+                {itemizedItems.map((item, idx) => (
+                  <li key={idx} className="flex items-center justify-between gap-2">
+                    <span>
+                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setItemizedItems(itemizedItems.filter((_, i) => i !== idx))}
+                    >Remove</Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-xs text-muted-foreground">Items will be saved as a JSON list of objects (name, quantity, value)</div>
             </div>
             
             <Button 
