@@ -5,16 +5,19 @@ import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { useChainId } from 'wagmi'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
 
 export const RecentTransactions = () => {
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
   // Use new getAllRecentTransactions for efficient loading
   const { data: allTxData } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getAllRecentTransactions',
-    query: { refetchInterval: 3000 },
+    query: { refetchInterval: 5000 },
   })
 
   // Parse the transaction data from the new contract format

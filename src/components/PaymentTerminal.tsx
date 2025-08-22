@@ -9,27 +9,29 @@ import { UserPanel } from './UserPanel'
 import { TransactionStatus } from './TransactionStatus'
 import { RecentTransactions } from './RecentTransactions'
 import { DebugPanel } from './DebugPanel'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { useChainId } from 'wagmi'
+
 import { Terminal, Zap, Users, Settings } from 'lucide-react'
 
 export const PaymentTerminal = () => {
+
   const { address, isConnected } = useAccount()
   const [activeTab, setActiveTab] = useState('terminal')
-
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
   // Check if connected user is owner
   const { data: owner } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'owner',
   })
-
   const isOwner = owner && address && owner.toLowerCase() === address.toLowerCase()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-terminal-bg to-background">
       {/* Background glow effect */}
       <div className="fixed inset-0 bg-gradient-glow pointer-events-none" />
-      
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* Header */}
         <motion.div
@@ -46,7 +48,7 @@ export const PaymentTerminal = () => {
                 Payment Terminal
               </h1>
               <p className="text-muted-foreground font-mono text-sm">
-                {CONTRACT_ADDRESS}
+                {contractAddress}
               </p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
                 Project ID: facd1356da9a88af48c3e1821f0d92cf

@@ -6,13 +6,16 @@ import { formatEther } from 'viem'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { useChainId } from 'wagmi'
 import { useToast } from '@/hooks/use-toast'
 import { CreditCard, Wallet, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
 
 export const UserPanel = () => {
   const { address } = useAccount()
   const { toast } = useToast()
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
 
   // Get user balance
   const { data: balance } = useBalance({
@@ -21,7 +24,7 @@ export const UserPanel = () => {
 
   // Get active transaction
   const { data: activeTransaction, refetch: refetchActive } = useReadContract({
-    address: CONTRACT_ADDRESS,
+  address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransactionFields',
     query: {
@@ -69,7 +72,7 @@ export const UserPanel = () => {
       return
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'payActiveTransaction',
       value: activeTransaction[1], // amount

@@ -1,15 +1,17 @@
-import { useReadContract } from 'wagmi'
+import { useReadContract, useChainId } from 'wagmi'
 import * as React from 'react'
 import { formatEther } from 'viem'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
 import { Activity, CheckCircle, XCircle, Clock } from 'lucide-react'
 
 export const TransactionStatus = () => {
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
   const { data: activeTransaction, refetch } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransactionFields',
     query: {

@@ -1,6 +1,7 @@
 import { http, createConfig } from 'wagmi'
-import { chiliz } from 'wagmi/chains'
+import { chiliz, bsc, mainnet } from 'wagmi/chains'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+
 
 // Custom Chiliz chain configuration
 const chilizSpicy = {
@@ -22,15 +23,36 @@ const chilizSpicy = {
   testnet: true,
 } as const
 
+// Placeholder contracts for other networks
+export const CONTRACTS = {
+  [chilizSpicy.id]: '0x5c6a6b809dd5d49c8d25127e67f82115858628e2',
+  [bsc.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real BSC contract
+  [mainnet.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real ETH contract
+}
+
+export function getCurrencySymbol(chainId?: number) {
+  switch (chainId) {
+    case chilizSpicy.id:
+      return 'CHZ';
+    case bsc.id:
+      return 'BNB';
+    case mainnet.id:
+      return 'ETH';
+    default:
+      return 'CHZ';
+  }
+}
+
 export const config = getDefaultConfig({
   appName: 'Payment Terminal',
-  projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1', // Generic project ID
-  chains: [chilizSpicy],
+  projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1',
+  chains: [chilizSpicy, bsc, mainnet],
   ssr: false,
 })
 
 // Contract configuration
-export const CONTRACT_ADDRESS = '0x5c6a6b809dd5d49c8d25127e67f82115858628e2' as const
+// Default to Chiliz contract, but use CONTRACTS[chainId] in app logic
+export const CONTRACT_ADDRESS = CONTRACTS[chilizSpicy.id]
 
 export const CONTRACT_ABI = [
   {"inputs":[],"name":"cancelActiveTransaction","outputs":[],"stateMutability":"nonpayable","type":"function"},

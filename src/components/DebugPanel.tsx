@@ -6,13 +6,16 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { useChainId } from 'wagmi'
 import { Code, Database, Eye, RefreshCw, Clock } from 'lucide-react'
 
 export const DebugPanel = () => {
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
   // Contract balance
   const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getContractBalance',
     query: { refetchInterval: 5000 },
@@ -20,7 +23,7 @@ export const DebugPanel = () => {
 
   // All recent transactions (tuple arrays)
   const { data: allTxData } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getAllRecentTransactions',
     query: { refetchInterval: 5000 },
@@ -39,7 +42,7 @@ export const DebugPanel = () => {
   const { writeContract } = useWriteContract();
   const handleClearActiveTransaction = () => {
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'clearActiveTransaction',
     } as any)
@@ -47,31 +50,31 @@ export const DebugPanel = () => {
 
   // Individual contract reads to avoid type issues
   const { data: owner, refetch: refetchOwner } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'owner',
   })
 
   const { data: txCounter, refetch: refetchTxCounter } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'txCounter',
   })
 
   const { data: maxRecentTx, refetch: refetchMaxRecentTx } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'MAX_RECENT_TX',
   })
 
   const { data: activeTransaction, refetch: refetchActiveTransaction } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransactionFields',
   })
 
   const { data: paymentStatus, refetch: refetchPaymentStatus } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getPaymentStatus',
   })
@@ -321,7 +324,7 @@ export const DebugPanel = () => {
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Contract Address</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    {CONTRACT_ADDRESS}
+                    {contractAddress}
                   </div>
                 </div>
                 

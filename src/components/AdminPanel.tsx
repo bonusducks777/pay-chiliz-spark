@@ -9,27 +9,46 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getCurrencySymbol } from '@/lib/wagmi'
+import { useChainId } from 'wagmi'
 import { useToast } from '@/hooks/use-toast'
 import { useMerchantInfo } from '@/hooks/use-merchant-info'
 import { Settings, Plus, X, Wallet, Loader2, Store, MapPin } from 'lucide-react'
 
 export const AdminPanel = () => {
+  const chainId = useChainId();
+  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [itemizedItems, setItemizedItems] = useState<{ name: string; quantity: string; value: string }[]>([])
-  const [newItem, setNewItem] = useState({ name: '', quantity: '', value: '' })
+  const [newItem, setNewItem] = useState({ name: '', quantity: '1', value: '' })
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const { toast } = useToast()
   const { merchantInfo, updateMerchantInfo } = useMerchantInfo()
 
   // Get contract balance
   const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getContractBalance',
     query: { refetchInterval: 5000 },
   })
+
+  // Auto-calculate amount from itemizedItems
+  // Get current currency symbol
+  const [currency, setCurrency] = useState(getCurrencySymbol())
+  React.useEffect(() => {
+    if (itemizedItems.length > 0) {
+      const total = itemizedItems.reduce((sum, item) => {
+        const qty = parseFloat(item.quantity) || 0;
+        const val = parseFloat(item.value) || 0;
+        return sum + qty * val;
+      }, 0);
+      setAmount(total ? total.toFixed(2) : '');
+    } else {
+      setAmount('');
+    }
+  }, [itemizedItems]);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract({
     mutation: {
@@ -89,7 +108,7 @@ export const AdminPanel = () => {
     }
     console.log('Setting active transaction...')
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'setActiveTransaction',
       args: [parseEther(amount), description, merchantInfo.name, merchantInfo.location, itemizedListJson],
@@ -103,7 +122,7 @@ export const AdminPanel = () => {
   const handleCancelTransaction = () => {
     console.log('handleCancelTransaction called')
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'cancelActiveTransaction',
     } as any)
@@ -124,7 +143,7 @@ export const AdminPanel = () => {
 
     console.log('Initiating withdrawal...')
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'withdraw',
       args: [withdrawAddress as `0x${string}`],
@@ -137,7 +156,7 @@ export const AdminPanel = () => {
   const handleClearActiveTransaction = () => {
     console.log('handleClearActiveTransaction called')
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress,
       abi: CONTRACT_ABI,
       functionName: 'clearActiveTransaction',
     } as any)
@@ -150,7 +169,7 @@ export const AdminPanel = () => {
       className="space-y-6"
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Merchant Settings */}
+        {/* Merchant Settings (1/3 width) */}
         <Card className="shadow-card bg-gradient-card border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -185,8 +204,8 @@ export const AdminPanel = () => {
           </CardContent>
         </Card>
 
-        {/* Create Transaction */}
-        <Card className="shadow-card bg-gradient-card border-border/50">
+  {/* Create Transaction (1/3 width) */}
+  <Card className="shadow-card bg-gradient-card border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
@@ -195,25 +214,18 @@ export const AdminPanel = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Contract Balance</Label>
-              <div className="font-mono text-lg text-primary">
-                {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (CHZ) *</Label>
+              <Label htmlFor="amount">Amount ({currency}) *</Label>
               <Input
                 id="amount"
                 type="number"
                 step="0.001"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.000"
+                placeholder={`0.000 ${currency}`}
                 className="font-mono"
+                readOnly
               />
             </div>
-            
             <div className="space-y-2">
               <Label htmlFor="description">Description *</Label>
               <Textarea
@@ -224,8 +236,6 @@ export const AdminPanel = () => {
                 rows={2}
               />
             </div>
-            
-
             <div className="space-y-2">
               <Label htmlFor="itemizedList">Itemized List</Label>
               <div className="flex gap-2 flex-wrap">
@@ -249,7 +259,7 @@ export const AdminPanel = () => {
                   id="itemValue"
                   value={newItem.value}
                   onChange={e => setNewItem({ ...newItem, value: e.target.value })}
-                  placeholder="Value"
+                  placeholder={`Value (${currency})`}
                   className="w-24"
                   type="number"
                   min="0"
@@ -270,7 +280,7 @@ export const AdminPanel = () => {
                 {itemizedItems.map((item, idx) => (
                   <li key={idx} className="flex items-center justify-between gap-2">
                     <span>
-                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
+                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value} {currency}</span>
                     </span>
                     <Button
                       type="button"
@@ -283,7 +293,6 @@ export const AdminPanel = () => {
               </ul>
               <div className="text-xs text-muted-foreground">Items will be saved as a JSON list of objects (name, quantity, value)</div>
             </div>
-            
             <Button 
               onClick={handleSetTransaction}
               disabled={isPending || isConfirming || !merchantInfo.name || !merchantInfo.location}
@@ -305,7 +314,7 @@ export const AdminPanel = () => {
         </Card>
 
         {/* Transaction Management */}
-        <Card className="shadow-card bg-gradient-card border-border/50">
+  <Card className="shadow-card bg-gradient-card border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary" />
@@ -313,21 +322,27 @@ export const AdminPanel = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-              <Button 
-                variant="outline" 
-                onClick={handleClearActiveTransaction}
-                disabled={isPending || isConfirming}
-                className="w-full mb-2"
-              >
-                {isPending || isConfirming ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Clearing...
-                  </>
-                ) : (
-                  'Clear Active Transaction'
-                )}
-              </Button>
+            <div className="space-y-2">
+              <Label>Contract Balance</Label>
+              <div className="font-mono text-lg text-primary">
+                {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={handleClearActiveTransaction}
+              disabled={isPending || isConfirming}
+              className="w-full mb-2"
+            >
+              {isPending || isConfirming ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                'Clear Active Transaction'
+              )}
+            </Button>
             <Button 
               variant="destructive" 
               onClick={handleCancelTransaction}
@@ -346,9 +361,7 @@ export const AdminPanel = () => {
                 </>
               )}
             </Button>
-
             <Separator />
-
             <div className="space-y-2">
               <Label htmlFor="withdraw">Withdraw to Address</Label>
               <Input
@@ -359,7 +372,6 @@ export const AdminPanel = () => {
                 className="font-mono"
               />
             </div>
-            
             <Button 
               variant="secondary" 
               onClick={handleWithdraw}
