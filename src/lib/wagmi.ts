@@ -24,10 +24,31 @@ const chilizSpicy = {
   testnet: true,
 } as const
 
+// Custom Circle Layer Testnet configuration
+const circleLayerTestnet = {
+  id: 28525,
+  name: 'Circle Layer Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'CLAYER',
+    symbol: 'CLAYER',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://testnet-rpc.circlelayer.com'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'Circle Layer Explorer', url: 'https://explorer-testnet.circlelayer.com' },
+  },
+  testnet: true,
+} as const
+
 
 // Placeholder contracts for other networks
 export const CONTRACTS = {
   [chilizSpicy.id]: '0x2e0f3F84CA4Da3F006C326beeb62194C1F7965A2',
+  [circleLayerTestnet.id]: '0x7AeE0CbBcd0e5257931f7dC87F0345C1bB2aab39',
   [bsc.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real BSC contract
   [mainnet.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real ETH contract
 }
@@ -45,6 +66,12 @@ export const SUPPORTED_TOKENS: Record<number, Array<{
     { shortcode: 'usd', address: '0x1111111111111111111111111111111111111111', name: 'USD Stable', symbol: 'USD', decimals: 18 },
     { shortcode: 'fan', address: '0x2222222222222222222222222222222222222222', name: 'Fan Token', symbol: 'FAN', decimals: 18 },
     { shortcode: 'soc', address: '0x3333333333333333333333333333333333333333', name: 'Socios', symbol: 'SOC', decimals: 18 },
+  ],
+  [circleLayerTestnet.id]: [
+    { shortcode: 'native', address: '0x0000000000000000000000000000000000000000', name: 'Circle Layer', symbol: 'CLAYER', decimals: 18 },
+    { shortcode: 'usdc', address: '0x1111111111111111111111111111111111111111', name: 'USD Coin', symbol: 'USDC', decimals: 6 },
+    { shortcode: 'usdt', address: '0x2222222222222222222222222222222222222222', name: 'Tether USD', symbol: 'USDT', decimals: 6 },
+    { shortcode: 'dai', address: '0x3333333333333333333333333333333333333333', name: 'Dai Stablecoin', symbol: 'DAI', decimals: 18 },
   ],
   [bsc.id]: [
     { shortcode: 'native', address: '0x0000000000000000000000000000000000000000', name: 'BNB', symbol: 'BNB', decimals: 18 },
@@ -67,7 +94,7 @@ export function getSupportedTokens(chainId: number) {
 export const config = getDefaultConfig({
   appName: 'Payment Terminal',
   projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1',
-  chains: [chilizSpicy, bsc, mainnet],
+  chains: [chilizSpicy, circleLayerTestnet, bsc, mainnet],
   ssr: false,
 })
 
