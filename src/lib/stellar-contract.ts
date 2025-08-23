@@ -1,6 +1,5 @@
+import * as StellarSdk from '@stellar/stellar-sdk';
 import { isConnected, setAllowed, getUserInfo, signTransaction } from '@stellar/freighter-api';
-import { Client as PaymentTerminalClient, Transaction } from 'payment-terminal-contract';
-import { Networks, Asset, scValToNative } from '@stellar/stellar-sdk';
 
 export interface StellarTransaction {
   id: string;
@@ -21,23 +20,20 @@ export const STELLAR_TOKENS = [
 ];
 
 export class StellarContractClient {
-  private client: PaymentTerminalClient;
+  private contractAddress: string;
+  private rpcUrl: string;
+  private server: StellarSdk.rpc.Server;
+  private horizonServer: StellarSdk.Horizon.Server;
+  private contract: StellarSdk.Contract;
 
   constructor(contractAddress: string, rpcUrl: string) {
-    // Initialize with basic options, we'll set up signing per transaction
-    this.client = new PaymentTerminalClient({
-      contractId: contractAddress,
-      rpcUrl,
-      networkPassphrase: Networks.TESTNET,
-      publicKey: 'GBWAX5ZDTNZYMI2L5KFFMVK6DFDVN7FZERDLPTQAEHGRKHQBIY5KVCHQ', // The owner's public key
-      signTransaction: async (tx: string) => {
-        console.log('Client signTransaction called for tx:', tx);
-        const signedXdr = await signTransaction(tx, {
-          networkPassphrase: Networks.TESTNET
-        });
-        return { signedTxXdr: signedXdr };
-      }
-    });
+    this.contractAddress = contractAddress;
+    this.rpcUrl = rpcUrl;
+    // Use Soroban RPC server for contract operations
+    this.server = new StellarSdk.rpc.Server(rpcUrl);
+    // Use Horizon server for account operations
+    this.horizonServer = new StellarSdk.Horizon.Server('https://horizon-testnet.stellar.org');
+    this.contract = new StellarSdk.Contract(contractAddress);
   }
 
   // === HELPER METHODS ===
@@ -56,144 +52,94 @@ export class StellarContractClient {
     return userAddress;
   }
 
-  private convertToStellarTransaction(tx: Transaction | any): StellarTransaction {
-    console.log('Converting transaction:', tx);
+  private async buildAndSignTransaction(operation: StellarSdk.xdr.Operation): Promise<StellarSdk.Transaction> {
+    const userAddress = await this.ensureConnection();
     
-    // Handle both structured Transaction type and raw map data
-    if (tx._attributes || tx._value) {
-      // This is raw contract data, need to parse it
-      console.log('Converting raw contract data...');
-      return this.parseRawTransactionData(tx);
+    // Load the user's account
+    const account = await this.horizonServer.loadAccount(userAddress);
+    
+    // Build transaction
+    const transaction = new StellarSdk.TransactionBuilder(account, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: StellarSdk.Networks.TESTNET,
+    })
+    .addOperation(operation)
+    .setTimeout(30)
+    .build();
+    
+    // Sign with Freighter
+    const signedXdr = await signTransaction(transaction.toXDR(), {
+      networkPassphrase: StellarSdk.Networks.TESTNET
+    });
+    
+    const signedTransaction = StellarSdk.TransactionBuilder.fromXDR(signedXdr, StellarSdk.Networks.TESTNET);
+    
+    // Ensure we return a Transaction, not a FeeBumpTransaction
+    if ('innerTransaction' in signedTransaction) {
+      return signedTransaction.innerTransaction;
     }
     
-    // This is structured Transaction type from the bindings
-    // Make sure field names match the contract specification
-    return {
-      id: tx.id ? tx.id.toString() : '0',
-      amount: tx.amount ? (Number(tx.amount) / 10000000).toString() : '0', // Convert from stroops
-      description: tx.description || '',
-      merchantName: tx.merchant_name || '',
-      merchantLocation: tx.merchant_location || '',
-      itemizedList: tx.itemized_list || '',
-      timestamp: tx.timestamp ? Number(tx.timestamp) * 1000 : 0, // Convert to milliseconds
-      paid: tx.paid || false,
-      cancelled: tx.cancelled || false,
-      payer: tx.payer || undefined,
-      requestedTokenContract: tx.requested_token_contract || ''
-    };
+    return signedTransaction as StellarSdk.Transaction;
   }
 
-  private parseRawTransactionData(rawData: any): StellarTransaction {
-    console.log('Parsing raw transaction data:', rawData);
+  private async simulateTransaction(operation: StellarSdk.xdr.Operation): Promise<any> {
+    // Use a dummy account for simulation only
+    const dummySource = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
+    const sourceAccount = new StellarSdk.Account(dummySource, '0');
     
-    // The data is coming as a map with key-value pairs
-    const dataMap = new Map();
+    // Build transaction for simulation
+    const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
+      fee: StellarSdk.BASE_FEE,
+      networkPassphrase: StellarSdk.Networks.TESTNET,
+    })
+    .addOperation(operation)
+    .setTimeout(30)
+    .build();
     
-    if (rawData._value) {
-      // Extract key-value pairs from the raw data
-      for (const entry of rawData._value) {
-        const key = Buffer.from(entry._attributes.key._value.data).toString();
-        const val = entry._attributes.val;
-        
-        let value;
-        switch (val._switch.name) {
-          case 'scvString':
-            value = Buffer.from(val._value.data).toString();
-            break;
-          case 'scvI128':
-            value = val._value._attributes.lo._value;
-            break;
-          case 'scvU64':
-            value = val._value._value;
-            break;
-          case 'scvBool':
-            value = val._value;
-            break;
-          case 'scvVoid':
-            value = null;
-            break;
-          case 'scvAddress':
-            // Convert address to string representation
-            if (val._value && val._value._value && val._value._value.data) {
-              // This is a contract address - convert buffer to hex string
-              const addressBuffer = Buffer.from(val._value._value.data);
-              value = 'C' + addressBuffer.toString('hex').toUpperCase();
-            } else {
-              value = val._value;
-            }
-            break;
-          default:
-            value = val._value;
-        }
-        
-        dataMap.set(key, value);
+    // Simulate the transaction
+    const simResult = await this.server.simulateTransaction(transaction);
+    
+    if (StellarSdk.rpc.Api.isSimulationSuccess(simResult)) {
+      if (simResult.result?.retval) {
+        return StellarSdk.scValToNative(simResult.result.retval);
       }
+    } else {
+      throw new Error(`Simulation failed: ${simResult.error}`);
     }
     
-    console.log('Parsed data map:', Array.from(dataMap.entries()));
-    
-    return {
-      id: dataMap.get('id') || '0',
-      amount: dataMap.get('amount') ? (Number(dataMap.get('amount')) / 10000000).toString() : '0',
-      description: dataMap.get('description') || '',
-      merchantName: dataMap.get('merchant_name') || '',
-      merchantLocation: dataMap.get('merchant_location') || '',
-      itemizedList: dataMap.get('itemized_list') || '',
-      timestamp: dataMap.get('timestamp') ? Number(dataMap.get('timestamp')) * 1000 : 0,
-      paid: dataMap.get('paid') || false,
-      cancelled: dataMap.get('cancelled') || false,
-      payer: dataMap.get('payer') || undefined,
-      requestedTokenContract: dataMap.get('requested_token_contract') || ''
-    };
+    return null;
   }
 
   // === CONTRACT READ FUNCTIONS ===
   
   async getActiveTransaction(): Promise<StellarTransaction | null> {
     try {
-      console.log('Fetching active transaction from Soroban contract');
+      console.log('Fetching active transaction from Soroban contract:', this.contractAddress);
       
-      // Try the normal approach first, catch the parsing error, and use simulation
-      try {
-        const result = await this.client.get_active_transaction();
-        console.log('Direct result (this will likely fail):', result.result);
-        return this.convertToStellarTransaction(result.result);
-      } catch (parseError) {
-        console.log('Direct parsing failed as expected, using simulation approach...');
-        
-        // The contract is returning raw map data, so simulate and handle raw result
-        const tx = await this.client.get_active_transaction();
-        const simResult = await tx.simulate();
-        
-        console.log('Simulation completed, checking for result...');
-        
-        // Check if simulation succeeded - look for the raw data structure
-        // that matches what we saw in the error logs
-        if (simResult && simResult.simulationData && simResult.simulationData.result && simResult.simulationData.result.retval) {
-          console.log('Found retval in simulation result, parsing raw data...');
-          
-          // The simulation result contains the raw map structure
-          // Let's work with it directly since we know the structure from the error logs
-          const rawData = simResult.simulationData.result.retval;
-          
-          // Check if this is the map structure we expect
-          // Based on the error logs, the data should have transaction fields
-          console.log('Raw data structure:', rawData);
-          try {
-            return this.parseRawTransactionData(rawData);
-          } catch (parseErr) {
-            console.log('Failed to parse raw data:', parseErr);
-            return null;
-          }
-          
-          console.log('Raw data is not in expected map format');
-          return null;
-        }
-        
-        console.log('No valid simulation result found');
+      const operation = this.contract.call('get_active_transaction');
+      const result = await this.simulateTransaction(operation);
+      
+      if (!result) {
+        console.log('No active transaction found');
         return null;
       }
       
+      console.log('Active transaction result:', result);
+      
+      // Convert the result to our interface
+      return {
+        id: result.id?.toString() || '',
+        amount: (Number(result.amount) / 10000000).toString(), // Convert from stroops
+        description: result.description || '',
+        merchantName: result.merchant_name || '',
+        merchantLocation: result.merchant_location || '',
+        itemizedList: result.itemized_list || '',
+        timestamp: Number(result.timestamp) * 1000, // Convert to milliseconds
+        paid: result.paid || false,
+        cancelled: result.cancelled || false,
+        payer: result.payer || undefined,
+        requestedTokenContract: result.requested_token_contract || ''
+      };
     } catch (error) {
       console.error('Error fetching active transaction:', error);
       return null;
@@ -202,23 +148,22 @@ export class StellarContractClient {
 
   async getPaymentStatus(): Promise<{ hasPendingTx: boolean; pendingTxPayer?: string; hasActiveTx: boolean; activeTxCreator?: string }> {
     try {
-      console.log('Fetching payment status from Soroban contract');
+      console.log('Fetching payment status from Soroban contract:', this.contractAddress);
       
-      const result = await this.client.get_payment_status();
+      const operation = this.contract.call('get_payment_status');
+      const result = await this.simulateTransaction(operation);
       
-      if (!result.result) {
+      if (!result) {
         return { hasPendingTx: false, hasActiveTx: false };
       }
       
-      console.log('Payment status result:', result.result);
-      
-      const [hasPendingTx, pendingTxPayer, hasActiveTx, activeTxCreator] = result.result;
+      console.log('Payment status result:', result);
       
       return {
-        hasPendingTx,
-        pendingTxPayer: pendingTxPayer || undefined,
-        hasActiveTx,
-        activeTxCreator: activeTxCreator || undefined
+        hasPendingTx: result[0] || false,
+        pendingTxPayer: result[1] || undefined,
+        hasActiveTx: result[2] || false,
+        activeTxCreator: result[3] || undefined
       };
     } catch (error) {
       console.error('Error fetching payment status:', error);
@@ -228,18 +173,32 @@ export class StellarContractClient {
 
   async getRecentTransactions(): Promise<StellarTransaction[]> {
     try {
-      console.log('Fetching recent transactions from Soroban contract');
+      console.log('Fetching recent transactions from Soroban contract:', this.contractAddress);
       
-      const result = await this.client.get_all_recent_transactions();
+      const operation = this.contract.call('get_all_recent_transactions');
+      const result = await this.simulateTransaction(operation);
       
-      if (!result.result || !Array.isArray(result.result)) {
+      if (!result || !Array.isArray(result)) {
         console.log('No recent transactions found');
         return [];
       }
       
-      console.log('Recent transactions result:', result.result);
+      console.log('Recent transactions result:', result);
       
-      return result.result.map(tx => this.convertToStellarTransaction(tx));
+      // Convert the results to our interface
+      return result.map((tx: any) => ({
+        id: tx.id?.toString() || '',
+        amount: (Number(tx.amount) / 10000000).toString(), // Convert from stroops
+        description: tx.description || '',
+        merchantName: tx.merchant_name || '',
+        merchantLocation: tx.merchant_location || '',
+        itemizedList: tx.itemized_list || '',
+        timestamp: Number(tx.timestamp) * 1000, // Convert to milliseconds
+        paid: tx.paid || false,
+        cancelled: tx.cancelled || false,
+        payer: tx.payer || undefined,
+        requestedTokenContract: tx.requested_token_contract || ''
+      }));
     } catch (error) {
       console.error('Error fetching recent transactions:', error);
       return [];
@@ -248,48 +207,15 @@ export class StellarContractClient {
 
   async getRecentTransactionsCount(): Promise<number> {
     try {
-      console.log('Fetching recent transactions count from Soroban contract');
+      console.log('Fetching recent transactions count from Soroban contract:', this.contractAddress);
       
-      const result = await this.client.get_recent_transactions_count();
+      const operation = this.contract.call('get_recent_transactions_count');
+      const result = await this.simulateTransaction(operation);
       
-      return Number(result.result) || 0;
+      return Number(result) || 0;
     } catch (error) {
       console.error('Error fetching transactions count:', error);
       return 0;
-    }
-  }
-
-  async getRecentTransactionAt(index: number): Promise<StellarTransaction | null> {
-    try {
-      console.log('Fetching recent transaction at index:', index);
-      
-      const result = await this.client.get_recent_transaction_at({ index });
-      
-      if (!result.result) {
-        return null;
-      }
-      
-      return this.convertToStellarTransaction(result.result);
-    } catch (error) {
-      console.error('Error fetching transaction at index:', error);
-      return null;
-    }
-  }
-
-  async getAllRecentTransactions(): Promise<StellarTransaction[]> {
-    try {
-      console.log('Fetching all recent transactions from Soroban contract');
-      
-      const result = await this.client.get_all_recent_transactions();
-      
-      if (!result.result) {
-        return [];
-      }
-      
-      return result.result.map(tx => this.convertToStellarTransaction(tx));
-    } catch (error) {
-      console.error('Error fetching all recent transactions:', error);
-      return [];
     }
   }
 
@@ -299,19 +225,21 @@ export class StellarContractClient {
 
   async getContractBalance(tokenContract: string): Promise<string> {
     try {
-      console.log('Fetching contract balance from Soroban contract', tokenContract);
+      console.log('Fetching contract balance from Soroban contract:', this.contractAddress, tokenContract);
       
-      // For native tokens, use the proper native asset contract address
       const tokenAddress = tokenContract === 'native' 
-        ? Asset.native().contractId(Networks.TESTNET)
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
         : tokenContract;
       
-      const result = await this.client.get_contract_balance({
-        token_contract: tokenAddress
-      });
+      const operation = this.contract.call(
+        'get_contract_balance',
+        StellarSdk.Address.fromString(tokenAddress).toScVal()
+      );
+      
+      const result = await this.simulateTransaction(operation);
       
       // Convert from stroops to XLM
-      return (Number(result.result) / 10000000).toString();
+      return (Number(result) / 10000000).toString();
     } catch (error) {
       console.error('Error fetching contract balance:', error);
       return '0';
@@ -320,7 +248,7 @@ export class StellarContractClient {
 
   async getOwner(): Promise<string | null> {
     try {
-      console.log('Fetching owner from Stellar contract');
+      console.log('Fetching owner from Stellar contract:', this.contractAddress);
       
       // Hardcoded owner address for this contract deployment
       const ownerAddress = 'GBWAX5ZDTNZYMI2L5KFFMVK6DFDVN7FZERDLPTQAEHGRKHQBIY5KVCHQ';
@@ -343,7 +271,7 @@ export class StellarContractClient {
     tokenContract: string
   ): Promise<void> {
     try {
-      console.log('Calling set_active_transaction on Soroban contract:', {
+      console.log('Calling set_active_transaction on Soroban contract:', this.contractAddress, {
         amount,
         description,
         merchantName,
@@ -356,37 +284,31 @@ export class StellarContractClient {
       console.log('Using user address:', userAddress);
       
       // Convert amount to stroops (1 XLM = 10^7 stroops)
-      const amountInStroops = BigInt(Math.floor(parseFloat(amount) * 10000000));
+      const amountInStroops = Math.floor(parseFloat(amount) * 10000000);
       
-      // For native tokens, use the proper native asset contract address
+      // Create contract invocation for set_active_transaction
       const tokenAddress = tokenContract === 'native' 
-        ? Asset.native().contractId(Networks.TESTNET)
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
         : tokenContract;
       
-      // Create the transaction using the generated bindings
-      const transaction = await this.client.set_active_transaction({
-        caller: userAddress,
-        amount: amountInStroops,
-        description,
-        merchant_name: merchantName,
-        merchant_location: merchantLocation,
-        itemized_list: itemizedList,
-        requested_token_contract: tokenAddress
-      });
+      const operation = this.contract.call(
+        'set_active_transaction',
+        StellarSdk.Address.fromString(userAddress).toScVal(), // caller
+        StellarSdk.nativeToScVal(amountInStroops, { type: 'i128' }), // amount
+        StellarSdk.nativeToScVal(description, { type: 'string' }),   // description
+        StellarSdk.nativeToScVal(merchantName, { type: 'string' }),  // merchant_name
+        StellarSdk.nativeToScVal(merchantLocation, { type: 'string' }), // merchant_location
+        StellarSdk.nativeToScVal(itemizedList, { type: 'string' }),  // itemized_list
+        StellarSdk.Address.fromString(tokenAddress).toScVal() // requested_token_contract
+      );
       
-      // Check if additional signatures are needed and log details
-      console.log('Transaction object:', transaction);
-      const additionalSigners = transaction.needsNonInvokerSigningBy();
-      console.log('needsNonInvokerSigningBy result:', additionalSigners);
+      // Build and sign transaction
+      const signedTransaction = await this.buildAndSignTransaction(operation);
       
-      // For transactions that need the invoker (caller) to sign, we need to handle it differently
-      // The caller should be the same as the user making the transaction
-      console.log('Transaction caller (should match user):', userAddress);
+      // Submit the transaction
+      const transactionResult = await this.server.sendTransaction(signedTransaction);
       
-      // Sign and send the transaction with Freighter (using client's signTransaction)
-      const result = await transaction.signAndSend();
-      
-      console.log('Soroban contract call successful:', result);
+      console.log('Soroban contract call successful:', transactionResult);
     } catch (error) {
       console.error('Error calling set_active_transaction:', error);
       throw new Error(`Failed to create transaction: ${error}`);
@@ -395,20 +317,24 @@ export class StellarContractClient {
 
   async payActiveTransaction(): Promise<void> {
     try {
-      console.log('Calling pay_active_transaction on Soroban contract');
+      console.log('Calling pay_active_transaction on Soroban contract:', this.contractAddress);
       
       const userAddress = await this.ensureConnection();
       console.log('Using payer address:', userAddress);
       
-      // Create the transaction using the generated bindings
-      const transaction = await this.client.pay_active_transaction({
-        payer: userAddress
-      });
+      // Create contract invocation for pay_active_transaction
+      const operation = this.contract.call(
+        'pay_active_transaction',
+        StellarSdk.Address.fromString(userAddress).toScVal() // payer
+      );
       
-      // Sign and send the transaction with Freighter
-      const result = await transaction.signAndSend();
+      // Build and sign transaction
+      const signedTransaction = await this.buildAndSignTransaction(operation);
       
-      console.log('Payment transaction successful:', result);
+      // Submit the transaction
+      const transactionResult = await this.server.sendTransaction(signedTransaction);
+      
+      console.log('Payment transaction successful:', transactionResult);
     } catch (error) {
       console.error('Error paying transaction:', error);
       throw new Error(`Failed to pay transaction: ${error}`);
@@ -417,19 +343,23 @@ export class StellarContractClient {
 
   async cancelActiveTransaction(): Promise<void> {
     try {
-      console.log('Cancelling active transaction on Stellar contract');
+      console.log('Cancelling active transaction on Stellar contract:', this.contractAddress);
       
       const userAddress = await this.ensureConnection();
       
-      // Create the transaction using the generated bindings
-      const transaction = await this.client.cancel_active_transaction({
-        caller: userAddress
-      });
+      // Create contract invocation for cancel_active_transaction
+      const operation = this.contract.call(
+        'cancel_active_transaction',
+        StellarSdk.Address.fromString(userAddress).toScVal() // caller
+      );
       
-      // Sign and send the transaction with Freighter
-      const result = await transaction.signAndSend();
+      // Build and sign transaction
+      const signedTransaction = await this.buildAndSignTransaction(operation);
       
-      console.log('Stellar transaction cancelled successfully:', result);
+      // Submit the transaction
+      const transactionResult = await this.server.sendTransaction(signedTransaction);
+      
+      console.log('Stellar transaction cancelled successfully:', transactionResult);
     } catch (error) {
       console.error('Error cancelling transaction:', error);
       throw new Error(`Failed to cancel transaction: ${error}`);
@@ -438,19 +368,23 @@ export class StellarContractClient {
 
   async clearActiveTransaction(): Promise<void> {
     try {
-      console.log('Clearing active transaction on Stellar contract');
+      console.log('Clearing active transaction on Stellar contract:', this.contractAddress);
       
       const userAddress = await this.ensureConnection();
       
-      // Create the transaction using the generated bindings
-      const transaction = await this.client.clear_active_transaction({
-        caller: userAddress
-      });
+      // Create contract invocation for clear_active_transaction
+      const operation = this.contract.call(
+        'clear_active_transaction',
+        StellarSdk.Address.fromString(userAddress).toScVal() // caller
+      );
       
-      // Sign and send the transaction with Freighter
-      const result = await transaction.signAndSend();
+      // Build and sign transaction
+      const signedTransaction = await this.buildAndSignTransaction(operation);
       
-      console.log('Stellar transaction cleared successfully:', result);
+      // Submit the transaction
+      const transactionResult = await this.server.sendTransaction(signedTransaction);
+      
+      console.log('Stellar transaction cleared successfully:', transactionResult);
     } catch (error) {
       console.error('Error clearing transaction:', error);
       throw new Error(`Failed to clear transaction: ${error}`);
@@ -459,26 +393,29 @@ export class StellarContractClient {
 
   async withdraw(tokenContract: string, to: string): Promise<void> {
     try {
-      console.log('Withdrawing from Stellar contract:', { tokenContract, to });
+      console.log('Withdrawing from Stellar contract:', this.contractAddress, { tokenContract, to });
       
       const userAddress = await this.ensureConnection();
       
-      // For native tokens, use the proper native asset contract address
       const tokenAddress = tokenContract === 'native' 
-        ? Asset.native().contractId(Networks.TESTNET)
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
         : tokenContract;
       
-      // Create the transaction using the generated bindings
-      const transaction = await this.client.withdraw({
-        caller: userAddress,
-        to,
-        token_contract: tokenAddress
-      });
+      // Create contract invocation for withdraw
+      const operation = this.contract.call(
+        'withdraw',
+        StellarSdk.Address.fromString(userAddress).toScVal(), // caller
+        StellarSdk.Address.fromString(to).toScVal(), // to
+        StellarSdk.Address.fromString(tokenAddress).toScVal() // token_contract
+      );
       
-      // Sign and send the transaction with Freighter
-      const result = await transaction.signAndSend();
+      // Build and sign transaction
+      const signedTransaction = await this.buildAndSignTransaction(operation);
       
-      console.log('Stellar withdrawal completed successfully:', result);
+      // Submit the transaction
+      const transactionResult = await this.server.sendTransaction(signedTransaction);
+      
+      console.log('Stellar withdrawal completed successfully:', transactionResult);
     } catch (error) {
       console.error('Error withdrawing:', error);
       throw new Error(`Failed to withdraw: ${error}`);
