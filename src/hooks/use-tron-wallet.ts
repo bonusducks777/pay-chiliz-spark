@@ -140,22 +140,37 @@ export const useTronWallet = () => {
         }
       }
 
-      // Wait a bit for TronLink to update
+      // Wait a bit for TronLink to update  
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Check connection again
+      // Force a connection check to update state
+      await checkConnection();
+      
+      // Double-check connection status
       if (window.tronWeb && window.tronWeb.ready && window.tronWeb.defaultAddress?.base58) {
         const address = window.tronWeb.defaultAddress.base58;
         console.log('Successfully connected to address:', address);
+        
+        // Force state update
         setState({
           isConnected: true,
           address,
           isLoading: false,
           error: null,
         });
+        
+        // Trigger another check after a short delay to ensure persistence
+        setTimeout(() => checkConnection(), 500);
+        
         return address;
       } else {
-        throw new Error('Please unlock your TronLink wallet and try again.');
+        console.error('TronWeb state check failed:', {
+          tronWebExists: !!window.tronWeb,
+          tronWebReady: window.tronWeb?.ready,
+          hasAddress: !!window.tronWeb?.defaultAddress?.base58,
+          address: window.tronWeb?.defaultAddress?.base58
+        });
+        throw new Error('Connection established but wallet state not updated. Please try again.');
       }
     } catch (error) {
       console.error('Connection error:', error);
@@ -181,19 +196,33 @@ export const useTronWallet = () => {
 
   // Check connection on mount and when TronLink becomes available
   useEffect(() => {
+    // Initial connection check
     checkConnection();
 
-    // Listen for account changes
-    const handleAccountsChanged = () => {
+    // Set up polling to detect state changes
+    const interval = setInterval(() => {
       checkConnection();
+    }, 2000); // Check every 2 seconds
+
+    // Listen for TronLink events
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.message) {
+        const { action } = event.data.message;
+        if (action === 'accountsChanged' || action === 'connect' || action === 'disconnect') {
+          console.log('TronLink event detected:', action);
+          // Small delay to ensure TronLink has updated
+          setTimeout(() => checkConnection(), 100);
+        }
+      }
     };
 
-    if (typeof window !== 'undefined' && window.tronWeb) {
-      // TronLink doesn't have a standard event listener, so we poll
-      const interval = setInterval(checkConnection, 1000);
-      return () => clearInterval(interval);
-    }
-  }, []);
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [checkConnection]);
 
   return {
     ...state,
