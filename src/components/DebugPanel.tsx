@@ -8,107 +8,226 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
-import { Code, Database, Eye, RefreshCw, Clock } from 'lucide-react'
+import { useNetwork } from '@/lib/network-context'
+import { useStellarWallet } from '@/hooks/use-stellar-wallet'
+import { useTronWallet } from '@/hooks/use-tron-wallet'
+import { StellarContractClient } from '@/lib/stellar-contract'
+import { TronContractClient } from '@/lib/tron-contract'
+import { Code, Database, Eye, RefreshCw, Clock, Star } from 'lucide-react'
 
 export const DebugPanel = () => {
+  const { isEVM, isStellar, isTron, networkConfig } = useNetwork()
+  const stellarWallet = useStellarWallet()
+  const tronWallet = useTronWallet()
   const chainId = useChainId();
-  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
-  // Contract balance
+  
+  // EVM Contract data
+  const contractAddress = isEVM ? CONTRACTS[chainId] as `0x${string}` : undefined;
+  
+  // Stellar Data
+  const [stellarData, setStellarData] = React.useState<any>(null)
+  
+  // Tron Data
+  const [tronData, setTronData] = React.useState<any>(null)
+  
+  const stellarClient = React.useMemo(() => 
+    isStellar && networkConfig.contractAddress && networkConfig.rpcUrl
+      ? new StellarContractClient(networkConfig.contractAddress, networkConfig.rpcUrl)
+      : null
+  , [isStellar, networkConfig])
+
+  const tronClient = React.useMemo(() => 
+    isTron && networkConfig.contractAddress && networkConfig.rpcUrl
+      ? new TronContractClient(networkConfig.contractAddress, networkConfig.rpcUrl)
+      : null
+  , [isTron, networkConfig])
+
+  React.useEffect(() => {
+    if (stellarClient) {
+      const fetchStellarData = async () => {
+        try {
+          const data = await stellarClient.getAllContractData()
+          setStellarData(data)
+        } catch (error) {
+          console.error('Failed to fetch Stellar contract data:', error)
+          setStellarData(null)
+        }
+      }
+      
+      fetchStellarData()
+      const interval = setInterval(fetchStellarData, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [stellarClient])
+
+  React.useEffect(() => {
+    if (tronClient) {
+      const fetchTronData = async () => {
+        try {
+          const data = await tronClient.getAllContractData()
+          setTronData(data)
+        } catch (error) {
+          console.error('Failed to fetch Tron contract data:', error)
+          setTronData(null)
+        }
+      }
+      
+      fetchTronData()
+      const interval = setInterval(fetchTronData, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [tronClient])
+  
+  // EVM Contract balance
   const { data: contractBalance, refetch: refetchContractBalance } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getContractBalance',
-    query: { refetchInterval: 5000 },
+    query: { 
+      refetchInterval: 5000,
+      enabled: isEVM && !!contractAddress 
+    },
   })
 
-  // All recent transactions (tuple arrays)
+  // EVM All recent transactions (tuple arrays)
   const { data: allTxData } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getAllRecentTransactions',
-    query: { refetchInterval: 5000 },
+    query: { 
+      refetchInterval: 5000,
+      enabled: isEVM && !!contractAddress 
+    },
   })
 
   const allRecentTransactions = React.useMemo(() => {
-    if (!allTxData || !Array.isArray(allTxData) || allTxData.length < 11) return []; // Updated for ERC20 contract (11 fields)
+    if (!isEVM || !allTxData || !Array.isArray(allTxData) || allTxData.length < 11) return [];
     const [ids, amounts, payers, paids, timestamps, descriptions, cancelleds, merchantNames, merchantLocations, itemizedLists, requestedTokenContracts] = allTxData;
     return ids.map((id: any, i: number) => [
       id, amounts[i], payers[i], paids[i], timestamps[i], descriptions[i], cancelleds[i],
-      merchantNames[i], merchantLocations[i], itemizedLists[i], requestedTokenContracts[i] // Added requestedTokenContract
+      merchantNames[i], merchantLocations[i], itemizedLists[i], requestedTokenContracts[i]
     ]);
-  }, [allTxData]);
+  }, [isEVM, allTxData]);
 
-  // Write contract for clearActiveTransaction
+  // Write contract for clearActiveTransaction (EVM only)
   const { writeContract } = useWriteContract();
   const handleClearActiveTransaction = () => {
-    writeContract({
-      address: contractAddress,
-      abi: CONTRACT_ABI,
-      functionName: 'clearActiveTransaction',
-    } as any)
+    if (isEVM && contractAddress) {
+      writeContract({
+        address: contractAddress,
+        abi: CONTRACT_ABI,
+        functionName: 'clearActiveTransaction',
+      } as any)
+    }
   }
 
-  // Individual contract reads to avoid type issues
+  // Individual contract reads (EVM only)
   const { data: owner, refetch: refetchOwner } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'owner',
+    query: { enabled: isEVM && !!contractAddress }
   })
 
   const { data: txCounter, refetch: refetchTxCounter } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'txCounter',
+    query: { enabled: isEVM && !!contractAddress }
   })
 
   const { data: maxRecentTx, refetch: refetchMaxRecentTx } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'MAX_RECENT_TX',
+    query: { enabled: isEVM && !!contractAddress }
   })
 
   const { data: activeTransaction, refetch: refetchActiveTransaction } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransactionFields',
+    query: { enabled: isEVM && !!contractAddress }
   })
 
   const { data: paymentStatus, refetch: refetchPaymentStatus } = useReadContract({
     address: contractAddress,
     abi: CONTRACT_ABI,
     functionName: 'getPaymentStatus',
+    query: { enabled: isEVM && !!contractAddress }
   })
 
   // Debug logging
-  console.log('DebugPanel data:', {
+  console.log('DebugPanel data:', isEVM ? {
     owner,
     txCounter,
     maxRecentTx,
     activeTransaction,
     allRecentTransactions,
     paymentStatus
+  } : {
+    stellarConnected: stellarWallet.isConnected,
+    stellarAddress: stellarWallet.address,
+    stellarNetwork: networkConfig.name,
+    stellarContractId: networkConfig.contractAddress,
+    stellarData: stellarData
   })
 
   const handleRefresh = () => {
-    console.log('Debug panel refresh triggered')
-    refetchOwner()
-    refetchTxCounter()
-    refetchMaxRecentTx()
-    refetchActiveTransaction()
-    refetchContractBalance()
-    refetchPaymentStatus()
+    console.log('Debug panel refresh triggered for', networkConfig.type)
+    if (isEVM) {
+      refetchOwner()
+      refetchTxCounter()
+      refetchMaxRecentTx()
+      refetchActiveTransaction()
+      refetchContractBalance()
+      refetchPaymentStatus()
+    } else if (stellarClient) {
+      // Trigger Stellar data refresh
+      stellarClient.getAllContractData()
+        .then(setStellarData)
+        .catch(error => console.error('Stellar refresh failed:', error))
+    } else if (tronClient) {
+      // Trigger Tron data refresh
+      tronClient.getAllContractData()
+        .then(setTronData)
+        .catch(error => console.error('Tron refresh failed:', error))
+    }
   }
 
-  const contractData = [
+  // Network-specific contract data
+  const contractData = isEVM ? [
     { name: 'owner', description: 'Contract owner address', data: owner },
     { name: 'txCounter', description: 'Total transaction counter', data: txCounter },
     { name: 'MAX_RECENT_TX', description: 'Maximum recent transactions stored', data: maxRecentTx },
     { name: 'activeTransaction', description: 'Current active transaction details', data: activeTransaction },
     { name: 'paymentStatus', description: 'Payment status of active transaction', data: paymentStatus },
     { name: 'contractBalance', description: 'Current contract balance (CHZ)', data: contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ' },
-  ]
+  ] : isStellar ? [
+    { name: 'contractId', description: 'Stellar contract ID', data: networkConfig.contractAddress },
+    { name: 'rpcUrl', description: 'Stellar RPC endpoint', data: networkConfig.rpcUrl },
+    { name: 'owner', description: 'Contract owner address', data: stellarData?.owner || 'Loading...' },
+    { name: 'txCounter', description: 'Total transaction counter', data: stellarData?.txCounter || 0 },
+    { name: 'maxRecentTx', description: 'Maximum recent transactions', data: stellarData?.maxRecentTx || 10 },
+    { name: 'recentCount', description: 'Current recent transactions count', data: stellarData?.recentCount || 0 },
+    { name: 'activeTransaction', description: 'Current active transaction', data: stellarData?.activeTransaction || 'None' },
+    { name: 'paymentStatus', description: 'Payment status', data: stellarData?.paymentStatus || 'Loading...' },
+    { name: 'contractBalance', description: 'Contract balance (XLM)', data: stellarData?.contractBalance ? `${Number(stellarData.contractBalance) / 1e7} XLM` : '0.000 XLM' },
+    { name: 'walletConnected', description: 'Freighter wallet connected', data: stellarWallet.isConnected ? 'Yes' : 'No' },
+    { name: 'walletAddress', description: 'Connected wallet address', data: stellarWallet.address || 'Not connected' },
+  ] : isTron ? [
+    { name: 'contractAddress', description: 'Tron contract address', data: networkConfig.contractAddress },
+    { name: 'rpcUrl', description: 'Tron RPC endpoint', data: networkConfig.rpcUrl },
+    { name: 'owner', description: 'Contract owner address', data: tronData?.owner || 'Loading...' },
+    { name: 'txCounter', description: 'Total transaction counter', data: tronData?.txCounter || 0 },
+    { name: 'activeTransaction', description: 'Current active transaction', data: tronData?.activeTransaction || 'None' },
+    { name: 'contractBalance', description: 'Contract balance (TRX)', data: tronData?.contractBalance ? `${Number(tronData.contractBalance) / 1e6} TRX` : '0.000 TRX' },
+    { name: 'walletConnected', description: 'TronLink wallet connected', data: tronWallet.isConnected ? 'Yes' : 'No' },
+    { name: 'walletAddress', description: 'Connected wallet address', data: tronWallet.address || 'Not connected' },
+    { name: 'recentTransactionsCount', description: 'Recent transactions count', data: tronData?.recentTransactions?.length || 0 },
+  ] : []
 
-  const readFunctions = [
+  const readFunctions = isEVM ? [
     { name: 'owner', description: 'Contract owner address' },
     { name: 'txCounter', description: 'Total transaction counter' },
     { name: 'MAX_RECENT_TX', description: 'Maximum recent transactions stored' },
@@ -119,15 +238,41 @@ export const DebugPanel = () => {
     { name: 'getContractBalance', description: 'Get current contract balance' },
     { name: 'getRecentTransactionsCount', description: 'Get count of recent transactions' },
     { name: 'getRecentTransactionFields', description: 'Get specific transaction by index' },
-  ]
+  ] : isStellar ? [
+    { name: 'get_active_transaction', description: 'Get current active payment request' },
+    { name: 'get_recent_transactions', description: 'Get recent transaction history' },
+    { name: 'get_transaction_count', description: 'Get total transaction count' },
+    { name: 'get_owner', description: 'Get contract owner address' },
+    { name: 'get_payment_status', description: 'Check payment status' },
+  ] : isTron ? [
+    { name: 'owner', description: 'Contract owner address' },
+    { name: 'txCounter', description: 'Total transaction counter' },
+    { name: 'getActiveTransaction', description: 'Get current active transaction' },
+    { name: 'getRecentTransactions', description: 'Get recent transaction history' },
+    { name: 'getTxCounter', description: 'Get total transaction count' },
+    { name: 'getContractBalance', description: 'Get contract balance for token' },
+    { name: 'getOwner', description: 'Get contract owner address' },
+  ] : []
 
-  const writeFunctions = [
+  const writeFunctions = isEVM ? [
     { name: 'setActiveTransaction', description: 'Create new payment request (Owner only)', params: ['uint256 amount', 'string description'] },
     { name: 'cancelActiveTransaction', description: 'Cancel current transaction (Owner only)', params: [] },
     { name: 'clearActiveTransaction', description: 'Clear completed transaction (Owner only)', params: [] },
     { name: 'payActiveTransaction', description: 'Pay the active transaction', params: [] },
     { name: 'withdraw', description: 'Withdraw contract balance (Owner only)', params: ['address payable to'] },
-  ]
+  ] : isStellar ? [
+    { name: 'set_active_transaction', description: 'Create new payment request (Owner only)', params: ['amount: u64', 'description: String'] },
+    { name: 'cancel_active_transaction', description: 'Cancel current transaction (Owner only)', params: [] },
+    { name: 'clear_active_transaction', description: 'Clear completed transaction (Owner only)', params: [] },
+    { name: 'pay_active_transaction', description: 'Pay the active transaction', params: [] },
+    { name: 'withdraw', description: 'Withdraw contract balance (Owner only)', params: ['to: Address'] },
+  ] : isTron ? [
+    { name: 'setActiveTransaction', description: 'Create new payment request (Owner only)', params: ['uint256 amount', 'string description', 'string merchantName', 'string merchantLocation', 'string itemizedList', 'address tokenContract'] },
+    { name: 'cancelActiveTransaction', description: 'Cancel current transaction (Owner only)', params: [] },
+    { name: 'clearActiveTransaction', description: 'Clear completed transaction (Owner only)', params: [] },
+    { name: 'payActiveTransaction', description: 'Pay the active transaction', params: [] },
+    { name: 'withdraw', description: 'Withdraw contract balance (Owner only)', params: ['address to'] },
+  ] : []
 
   return (
     <motion.div
@@ -137,8 +282,9 @@ export const DebugPanel = () => {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Code className="w-5 h-5 text-primary" />
+          {isEVM ? <Code className="w-5 h-5 text-primary" /> : <Star className="w-5 h-5 text-primary" />}
           <h2 className="text-xl font-bold">Debug Console</h2>
+          <Badge variant="outline">{networkConfig.name}</Badge>
         </div>
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -148,9 +294,9 @@ export const DebugPanel = () => {
 
       <Tabs defaultValue="state" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="state">Contract State</TabsTrigger>
-          <TabsTrigger value="functions">Functions</TabsTrigger>
-          <TabsTrigger value="events">Contract Info</TabsTrigger>
+          <TabsTrigger value="state">{isEVM ? 'Contract State' : 'Network State'}</TabsTrigger>
+          <TabsTrigger value="functions">{isEVM ? 'Functions' : 'Methods'}</TabsTrigger>
+          <TabsTrigger value="events">{isEVM ? 'Contract Info' : 'Network Info'}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="state" className="space-y-4">
@@ -190,9 +336,29 @@ export const DebugPanel = () => {
                     </div>
                   ))}
                   {/* Button to clear active transaction */}
-                  <Button onClick={handleClearActiveTransaction} variant="outline" className="mt-2 w-full">
-                    Clear Active Transaction
-                  </Button>
+                  {isEVM && (
+                    <Button onClick={handleClearActiveTransaction} variant="outline" className="mt-2 w-full">
+                      Clear Active Transaction
+                    </Button>
+                  )}
+                  {isStellar && stellarClient && (
+                    <Button 
+                      onClick={() => stellarClient.clearActiveTransaction().catch(console.error)} 
+                      variant="outline" 
+                      className="mt-2 w-full"
+                    >
+                      Clear Active Transaction (Stellar)
+                    </Button>
+                  )}
+                  {isTron && tronClient && (
+                    <Button 
+                      onClick={() => tronClient.clearActiveTransaction().catch(console.error)} 
+                      variant="outline" 
+                      className="mt-2 w-full"
+                    >
+                      Clear Active Transaction (Tron)
+                    </Button>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -207,43 +373,64 @@ export const DebugPanel = () => {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] pr-4">
-                {allRecentTransactions.length > 0 ? (
-                  <div className="space-y-2">
-                    {[...allRecentTransactions].reverse().map((tx, idx) => (
-                      <div key={tx[0].toString()} className="flex items-center justify-between p-2 rounded bg-secondary/30 border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">#{tx[0].toString()}</span>
-                          <Badge variant={tx[6] ? 'destructive' : tx[3] ? 'default' : 'secondary'} className="text-xs">
-                            {tx[6] ? 'Cancelled' : tx[3] ? 'Paid' : 'Pending'}
-                          </Badge>
+                {(isEVM ? allRecentTransactions.length > 0 : 
+                  isStellar ? (stellarData?.recentTransactions || []).length > 0 :
+                  isTron ? (tronData?.recentTransactions || []).length > 0 : false) ? (
+                  <div className="space-y-2 font-mono text-xs">
+                    {isEVM ? (
+                      allRecentTransactions.map((tx, index) => (
+                        <div key={index} className="p-2 bg-secondary/30 rounded border border-border/50">
+                          <div className="grid grid-cols-4 gap-2">
+                            <span className="text-primary">ID: {tx[0]?.toString()}</span>
+                            <span>Amount: {tx[1]?.toString()}</span>
+                            <span>Paid: {tx[3] ? 'Yes' : 'No'}</span>
+                            <span>Cancelled: {tx[6] ? 'Yes' : 'No'}</span>
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            <div>Payer: {tx[2] || 'None'}</div>
+                            <div>Description: {tx[5] || 'No description'}</div>
+                            <div>Merchant: {tx[7] || 'Unknown'}</div>
+                          </div>
                         </div>
-                        <span className="font-mono text-xs">{tx[5]}</span>
-                        <span className="font-mono text-xs">{Number(tx[1]) / 1e18} CHZ</span>
-                        <span className="font-mono text-xs">{new Date(Number(tx[4]) * 1000).toLocaleDateString()}</span>
-                        {tx[9] && (
-                          <ul className="text-[10px] text-muted-foreground/80 list-disc pl-4 mt-1">
-                            {(() => {
-                              try {
-                                const items = JSON.parse(tx[9])
-                                if (Array.isArray(items) && items.length > 0) {
-                                  return items.map((item, idx) => (
-                                    <li key={idx}>
-                                      <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
-                                    </li>
-                                  ))
-                                }
-                                return <li className="text-muted-foreground">No items</li>
-                              } catch {
-                                return <li className="text-destructive">Invalid itemized list</li>
-                              }
-                            })()}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
+                      ))
+                    ) : isStellar ? (
+                      stellarData?.recentTransactions?.map((tx: any, index: number) => (
+                        <div key={index} className="p-2 bg-secondary/30 rounded border border-border/50">
+                          <div className="grid grid-cols-4 gap-2">
+                            <span className="text-primary">ID: {tx.id}</span>
+                            <span>Amount: {tx.amount} stroops</span>
+                            <span>Paid: {tx.paid ? 'Yes' : 'No'}</span>
+                            <span>Cancelled: {tx.cancelled ? 'Yes' : 'No'}</span>
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            <div>Payer: {tx.payer || 'None'}</div>
+                            <div>Description: {tx.description || 'No description'}</div>
+                            <div>Merchant: {tx.merchant_name || 'Unknown'}</div>
+                          </div>
+                        </div>
+                      )) || []
+                    ) : isTron ? (
+                      tronData?.recentTransactions?.map((tx: any, index: number) => (
+                        <div key={index} className="p-2 bg-secondary/30 rounded border border-border/50">
+                          <div className="grid grid-cols-4 gap-2">
+                            <span className="text-primary">ID: {tx.id}</span>
+                            <span>Amount: {tx.amount} TRX</span>
+                            <span>Paid: {tx.paid ? 'Yes' : 'No'}</span>
+                            <span>Cancelled: {tx.cancelled ? 'Yes' : 'No'}</span>
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            <div>Payer: {tx.payer || 'None'}</div>
+                            <div>Description: {tx.description || 'No description'}</div>
+                            <div>Merchant: {tx.merchantName || 'Unknown'}</div>
+                          </div>
+                        </div>
+                      )) || []
+                    ) : null}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-xs text-muted-foreground">No recent transactions</div>
+                  <div className="text-center py-4 text-xs text-muted-foreground">
+                    No recent transactions found
+                  </div>
                 )}
               </ScrollArea>
             </CardContent>
@@ -324,28 +511,35 @@ export const DebugPanel = () => {
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Contract Address</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    {contractAddress}
+                    {isEVM ? contractAddress : networkConfig.contractAddress || 'Not deployed'}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <span className="text-sm text-muted-foreground">Chain ID</span>
+                  <span className="text-sm text-muted-foreground">{isEVM ? 'Chain ID' : 'Network'}</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    88882 (Chiliz Spicy)
+                    {isEVM ? `${chainId} (${networkConfig.name})` : networkConfig.name}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">RPC URL</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    spicy-rpc.chiliz.com
+                    {isEVM ? 'Auto-detected' : networkConfig.rpcUrl || 'Not configured'}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <span className="text-sm text-muted-foreground">Contract Balance</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
-                    {contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ'}
+                    {isEVM 
+                      ? (contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ')
+                      : isStellar 
+                        ? (stellarData?.contractBalance ? `${Number(stellarData.contractBalance) / 1e7} XLM` : '0.000 XLM')
+                        : isTron
+                          ? (tronData?.contractBalance ? `${Number(tronData.contractBalance) / 1e6} TRX` : '0.000 TRX')
+                          : 'Unknown'
+                    }
                   </div>
                 </div>
               </div>

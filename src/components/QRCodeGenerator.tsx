@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
+import { useNetwork } from '@/lib/network-context';
 
 interface QRCodeGeneratorProps {
-  chainId: number;
+  chainId?: number;
   contractAddress: string;
   size?: number;
 }
@@ -19,15 +20,44 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   size = 128 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { networkConfig } = useNetwork();
 
   useEffect(() => {
-    if (canvasRef.current && contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000') {
-      const chainName = chainNames[chainId] || 'unknown';
+    if (canvasRef.current && contractAddress && 
+        contractAddress !== '0x0000000000000000000000000000000000000000' && 
+        contractAddress !== '') {
       
-      const payload = {
-        chain: chainName,
-        address: contractAddress
-      };
+      let payload;
+      
+      if (networkConfig.type === 'evm' && chainId) {
+        const chainName = chainNames[chainId] || 'unknown';
+        payload = {
+          type: 'evm',
+          chain: chainName,
+          chainId: chainId,
+          address: contractAddress
+        };
+      } else if (networkConfig.type === 'stellar') {
+        payload = {
+          type: 'stellar',
+          network: networkConfig.name,
+          contractId: contractAddress,
+          rpcUrl: networkConfig.rpcUrl
+        };
+      } else if (networkConfig.type === 'tron') {
+        payload = {
+          type: 'tron',
+          network: networkConfig.name,
+          contractAddress: contractAddress,
+          rpcUrl: networkConfig.rpcUrl
+        };
+      } else {
+        payload = {
+          type: networkConfig.type,
+          network: networkConfig.name,
+          address: contractAddress
+        };
+      }
 
       QRCode.toCanvas(canvasRef.current, JSON.stringify(payload), {
         width: size,
@@ -40,9 +70,11 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
         console.error('Failed to generate QR code:', error);
       });
     }
-  }, [chainId, contractAddress]);
+  }, [chainId, contractAddress, networkConfig]);
 
-  if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+  if (!contractAddress || 
+      contractAddress === '0x0000000000000000000000000000000000000000' ||
+      contractAddress === '') {
     return (
       <div 
         className="flex items-center justify-center border border-dashed border-muted-foreground/30 rounded"

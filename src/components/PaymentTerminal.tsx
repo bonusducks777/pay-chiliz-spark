@@ -1,33 +1,127 @@
 import { useState } from 'react'
+import * as React from 'react'
 import { motion } from 'framer-motion'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useReadContract } from 'wagmi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AdminPanel } from './AdminPanel'
+import { UniversalAdminPanel } from './UniversalAdminPanel'
 import { UserPanel } from './UserPanel'
-import { TransactionStatus } from './TransactionStatus'
-import { RecentTransactions } from './RecentTransactions'
+import { UniversalUserPanel } from './UniversalUserPanel'
+import { UniversalTransactionStatus } from './UniversalTransactionStatus'
+import { UniversalRecentTransactions } from './UniversalRecentTransactions'
 import { DebugPanel } from './DebugPanel'
 import { QRCodeGenerator } from './QRCodeGenerator'
+import { NetworkSelector } from './NetworkSelector'
+import { UniversalConnectButton } from './UniversalConnectButton'
+import { TronConnectButton } from './TronConnectButton'
+import { TronUserPanel } from './TronUserPanel'
+import { TronAdminPanel } from './TronAdminPanel'
+import { useNetwork } from '@/lib/network-context'
+import { useStellarWallet } from '@/hooks/use-stellar-wallet'
+import { useTronWallet } from '@/hooks/use-tron-wallet'
+import { StellarContractClient } from '@/lib/stellar-contract'
+import { TronContractClient } from '@/lib/tron-contract'
 import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 
 import { Terminal, Zap, Users, Settings } from 'lucide-react'
 
 export const PaymentTerminal = () => {
-
+  const { isEVM, isStellar, isTron, networkConfig } = useNetwork()
   const { address, isConnected } = useAccount()
+  const stellarWallet = useStellarWallet()
+  const tronWallet = useTronWallet()
   const [activeTab, setActiveTab] = useState('terminal')
   const chainId = useChainId();
-  const contractAddress = CONTRACTS[chainId] as `0x${string}`;
+  
+  // Get contract address based on network type
+  const contractAddress = isEVM 
+    ? CONTRACTS[chainId] as `0x${string}`
+    : networkConfig.contractAddress || '';
+  
   // Check if connected user is owner
   const { data: owner } = useReadContract({
-    address: contractAddress,
+    address: contractAddress as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'owner',
+    query: { enabled: isEVM && !!contractAddress }
   })
-  const isOwner = owner && address && (typeof owner === 'string') && owner.toLowerCase() === address.toLowerCase()
+  
+  // For Stellar, implement owner check via contract client
+  const [stellarOwner, setStellarOwner] = React.useState<string | null>(null)
+  
+  // For Tron, implement owner check via contract client
+  const [tronOwner, setTronOwner] = React.useState<string | null>(null)
+  
+  React.useEffect(() => {
+    if (isStellar && networkConfig.contractAddress && networkConfig.rpcUrl) {
+      const stellarClient = new StellarContractClient(
+        networkConfig.contractAddress,
+        networkConfig.rpcUrl
+      )
+      stellarClient.getOwner().then((owner) => {
+        console.log('Stellar contract owner:', owner)
+        setStellarOwner(owner)
+      }).catch(() => setStellarOwner(null))
+    }
+  }, [isStellar, networkConfig])
+  
+  React.useEffect(() => {
+    if (isTron && networkConfig.contractAddress && networkConfig.rpcUrl) {
+      const tronClient = new TronContractClient(
+        networkConfig.contractAddress,
+        networkConfig.rpcUrl
+      )
+      tronClient.getOwner().then((owner) => {
+        console.log('Tron contract owner:', owner)
+        setTronOwner(owner)
+      }).catch(() => setTronOwner(null))
+    }
+  }, [isTron, networkConfig, tronWallet.isConnected]) // Added tronWallet.isConnected to re-check owner when wallet connects
+  
+  const isEVMOwner = isEVM && owner && address && (typeof owner === 'string') && owner.toLowerCase() === address.toLowerCase()
+  const isStellarOwner = isStellar && stellarWallet.isConnected && stellarOwner === stellarWallet.address
+  const isTronOwner = isTron && tronWallet.isConnected && tronOwner?.toLowerCase() === tronWallet.address?.toLowerCase()
+  const isOwner = isEVMOwner || isStellarOwner || isTronOwner
+  
+  // Debug logging for Tron owner checking
+  React.useEffect(() => {
+    if (isTron) {
+      console.log('=== TRON OWNER DEBUG ===')
+      console.log('isTron:', isTron)
+      console.log('tronWallet.isConnected:', tronWallet.isConnected)
+      console.log('tronWallet.address:', tronWallet.address)
+      console.log('tronOwner:', tronOwner)
+      console.log('tronOwner?.toLowerCase():', tronOwner?.toLowerCase())
+      console.log('tronWallet.address?.toLowerCase():', tronWallet.address?.toLowerCase())
+      console.log('Address match:', tronOwner?.toLowerCase() === tronWallet.address?.toLowerCase())
+      console.log('isTronOwner:', isTronOwner)
+      console.log('isOwner:', isOwner)
+      console.log('========================')
+    }
+  }, [isTron, tronWallet.isConnected, tronWallet.address, tronOwner, isTronOwner, isOwner])
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('=== OWNER DEBUG ===')
+    console.log('isEVM:', isEVM)
+    console.log('isStellar:', isStellar)
+    console.log('isTron:', isTron)
+    console.log('stellarWallet.isConnected:', stellarWallet.isConnected)
+    console.log('stellarWallet.address:', stellarWallet.address)
+    console.log('stellarOwner:', stellarOwner)
+    console.log('tronWallet.isConnected:', tronWallet.isConnected)
+    console.log('tronWallet.address:', tronWallet.address)
+    console.log('tronOwner:', tronOwner)
+    console.log('isOwner:', isOwner)
+    console.log('==================')
+  }, [isEVM, isStellar, isTron, stellarWallet.isConnected, stellarWallet.address, stellarOwner, tronWallet.isConnected, tronWallet.address, tronOwner, isOwner])
+  
+  // Universal connection status
+  const universalIsConnected = isEVM ? isConnected : (isStellar ? stellarWallet.isConnected : tronWallet.isConnected)
+  const universalAddress = isEVM ? address : (isStellar ? stellarWallet.address : tronWallet.address)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-terminal-bg to-background">
@@ -49,17 +143,20 @@ export const PaymentTerminal = () => {
                 Payment Terminal
               </h1>
               <p className="text-muted-foreground font-mono text-sm">
-                {contractAddress}
+                {contractAddress || 'No contract deployed'}
               </p>
               <p className="text-xs text-muted-foreground font-mono mt-1">
-                Project ID: facd1356da9a88af48c3e1821f0d92cf
+                Network: {networkConfig.name}
               </p>
             </div>
           </div>
-          <ConnectButton />
+          <div className="flex items-center gap-4">
+            <NetworkSelector />
+            <UniversalConnectButton />
+          </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!universalIsConnected ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -70,9 +167,9 @@ export const PaymentTerminal = () => {
                 <Zap className="w-16 h-16 mx-auto mb-4 text-primary animate-pulse" />
                 <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
                 <p className="text-muted-foreground mb-6">
-                  Connect your wallet to interact with the payment terminal
+                  Connect your wallet to interact with the payment terminal on {networkConfig.name}
                 </p>
-                <ConnectButton />
+                <UniversalConnectButton />
               </CardContent>
             </Card>
           </motion.div>
@@ -89,10 +186,10 @@ export const PaymentTerminal = () => {
                   <Terminal className="w-4 h-4" />
                   Terminal
                 </TabsTrigger>
-                {isOwner && (
+                {(isOwner || isTron) && (
                   <TabsTrigger value="admin" className="flex items-center gap-2">
                     <Settings className="w-4 h-4" />
-                    Admin
+                    Admin {isTron && !isOwner && '(Debug)'}
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="user" className="flex items-center gap-2">
@@ -107,8 +204,8 @@ export const PaymentTerminal = () => {
 
               <TabsContent value="terminal" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <TransactionStatus />
-                  <RecentTransactions />
+                  <UniversalTransactionStatus />
+                  <UniversalRecentTransactions />
                 </div>
                 
                 {/* Payment Instructions */}
@@ -188,7 +285,7 @@ export const PaymentTerminal = () => {
                         
                         <div className="p-6 bg-white rounded-xl shadow-sm border">
                           <QRCodeGenerator 
-                            chainId={chainId}
+                            chainId={isEVM ? chainId : undefined}
                             contractAddress={contractAddress}
                             size={160}
                           />
@@ -206,14 +303,14 @@ export const PaymentTerminal = () => {
                 </Card>
               </TabsContent>
 
-              {isOwner && (
+              {(isOwner || isTron) && (
                 <TabsContent value="admin">
-                  <AdminPanel />
+                  <UniversalAdminPanel />
                 </TabsContent>
               )}
 
               <TabsContent value="user">
-                <UserPanel />
+                <UniversalUserPanel />
               </TabsContent>
 
               <TabsContent value="debug">

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ItemizedTable } from '@/components/ui/itemized-table'
 import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
@@ -109,34 +110,15 @@ export const RecentTransactions = () => {
                           </p>
                         )}
                         {tx.itemizedList && (
-                          <div className="text-[10px] text-muted-foreground/80 mt-1">
-                            {(() => {
-                              try {
-                                const items = JSON.parse(tx.itemizedList)
-                                if (Array.isArray(items) && items.length > 0) {
-                                  return (
-                                    <div className="space-y-1">
-                                      <div className="grid grid-cols-[1fr_40px_60px] gap-1 font-semibold border-b pb-1">
-                                        <span>Item</span>
-                                        <span className="text-center">Qty</span>
-                                        <span className="text-center">Amount</span>
-                                      </div>
-                                      {items.map((item, idx) => (
-                                        <div key={idx} className="grid grid-cols-[1fr_40px_60px] gap-1">
-                                          <span className="font-semibold truncate">{item.name}</span>
-                                          <span className="text-center">{item.quantity}</span>
-                                          <span className="text-center font-mono">{item.value}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )
-                                }
-                                return <div className="text-muted-foreground">No items</div>
-                              } catch {
-                                return <div className="text-destructive">Invalid itemized list</div>
-                              }
+                          <ItemizedTable 
+                            itemizedList={tx.itemizedList}
+                            size="sm"
+                            currency={(() => {
+                              const token = supportedTokens.find(t => t.address.toLowerCase() === tx.requestedTokenContract.toLowerCase());
+                              return token ? token.symbol : '';
                             })()}
-                          </div>
+                            className="mt-2"
+                          />
                         )}
                       </div>
                     </div>

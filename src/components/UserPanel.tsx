@@ -6,6 +6,7 @@ import { formatEther } from 'viem'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ItemizedTable } from '@/components/ui/itemized-table'
 import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { useToast } from '@/hooks/use-toast'
@@ -296,26 +297,14 @@ export const UserPanel = () => {
                 )}
                 
                 {activeTransaction[9] && (
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Items</span>
-                    <ul className="text-xs bg-secondary/50 p-2 rounded border border-border/50 whitespace-pre-wrap max-h-20 overflow-y-auto list-disc pl-5">
-                      {(() => {
-                        try {
-                          const items = JSON.parse(activeTransaction[9])
-                          if (Array.isArray(items) && items.length > 0) {
-                            return items.map((item, idx) => (
-                              <li key={idx}>
-                                <span className="font-semibold">{item.name}</span> x{item.quantity} - <span className="font-mono">{item.value}</span>
-                              </li>
-                            ))
-                          }
-                          return <li className="text-muted-foreground">No items</li>
-                        } catch {
-                          return <li className="text-destructive">Invalid itemized list</li>
-                        }
-                      })()}
-                    </ul>
-                  </div>
+                  <ItemizedTable 
+                    itemizedList={activeTransaction[9]}
+                    size="sm"
+                    currency={(() => {
+                      const token = supportedTokens.find(t => t.address.toLowerCase() === String(activeTransaction[10]).toLowerCase());
+                      return token ? token.symbol : 'TOKEN';
+                    })()}
+                  />
                 )}
                 
                 <div className="flex items-center justify-between">
