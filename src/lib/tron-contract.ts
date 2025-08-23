@@ -800,10 +800,3 @@ export class TronContractClient {
     };
   }
 }
-
-// Global TronWeb type declaration
-declare global {
-  interface Window {
-    tronWeb: any;
-  }
-}
