@@ -7,10 +7,11 @@ export interface TronWalletState {
   error: string | null;
 }
 
-// Extend the Window interface to include tronWeb
+// Extend the Window interface to include tronWeb and tronLink
 declare global {
   interface Window {
     tronWeb?: any;
+    tronLink?: any;
   }
 }
 
@@ -30,7 +31,8 @@ export const useTronWallet = () => {
       const checkInterval = setInterval(() => {
         attempts++;
         
-        if (typeof window !== 'undefined' && window.tronWeb) {
+        // Check for both tronWeb and tronLink
+        if (typeof window !== 'undefined' && (window.tronWeb || window.tronLink)) {
           clearInterval(checkInterval);
           resolve(true);
         } else if (attempts >= maxAttempts) {
@@ -93,56 +95,58 @@ export const useTronWallet = () => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      // Wait for TronWeb to be available first
+      // Wait for TronWeb/TronLink to be available first
       const tronWebAvailable = await checkTronWebAvailability();
       
       if (!tronWebAvailable) {
         throw new Error('TronLink wallet not detected. Please install TronLink extension and refresh the page.');
       }
 
-      // Check if already connected
-      if (window.tronWeb && window.tronWeb.ready && window.tronWeb.defaultAddress?.base58) {
-        const address = window.tronWeb.defaultAddress.base58;
-        setState({
-          isConnected: true,
-          address,
-          isLoading: false,
-          error: null,
-        });
-        return address;
-      }
-
-      // Try different connection methods
+      // Use the recommended tronLink.request method first
       let result;
       
-      // Method 1: Modern TronLink API
-      if (window.tronWeb && window.tronWeb.request) {
+      if (window.tronLink && window.tronLink.request) {
         try {
+          console.log('Using recommended tronLink.request method');
+          result = await window.tronLink.request({
+            method: 'tron_requestAccounts',
+          });
+          console.log('TronLink request result:', result);
+        } catch (err) {
+          console.warn('TronLink.request failed, trying fallback methods', err);
+        }
+      }
+
+      // Fallback to tronWeb.request if tronLink not available
+      if (!result && window.tronWeb && window.tronWeb.request) {
+        try {
+          console.log('Using fallback tronWeb.request method');
           result = await window.tronWeb.request({
             method: 'tron_requestAccounts',
           });
         } catch (err) {
-          console.warn('Modern TronLink API failed, trying legacy method');
+          console.warn('TronWeb.request failed, trying legacy method', err);
         }
       }
 
-      // Method 2: Legacy method - trigger wallet popup
+      // Legacy method - trigger wallet popup
       if (!result && window.tronWeb) {
         try {
-          // This triggers the TronLink popup
+          console.log('Using legacy TronWeb method');
           await window.tronWeb.trx.getAccount();
           result = { code: 200 };
         } catch (err) {
-          console.warn('Legacy TronLink method failed');
+          console.warn('Legacy TronLink method failed', err);
         }
       }
 
       // Wait a bit for TronLink to update
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Check connection again
       if (window.tronWeb && window.tronWeb.ready && window.tronWeb.defaultAddress?.base58) {
         const address = window.tronWeb.defaultAddress.base58;
+        console.log('Successfully connected to address:', address);
         setState({
           isConnected: true,
           address,
@@ -154,6 +158,7 @@ export const useTronWallet = () => {
         throw new Error('Please unlock your TronLink wallet and try again.');
       }
     } catch (error) {
+      console.error('Connection error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to connect to TronLink';
       setState({
         isConnected: false,
