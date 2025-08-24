@@ -17,6 +17,7 @@ export const StellarUserPanel = () => {
   const [error, setError] = useState<string | null>(null)
   const [activeTransaction, setActiveTransaction] = useState<any>(null)
   const [userBalance, setUserBalance] = useState<string>('0')
+  const [isFetching, setIsFetching] = useState(false) // Prevent concurrent fetches
 
   const client = networkConfig.contractAddress && networkConfig.rpcUrl
     ? new StellarContractClient(networkConfig.contractAddress, networkConfig.rpcUrl)
@@ -35,56 +36,110 @@ export const StellarUserPanel = () => {
   }
 
   const fetchActiveTransaction = async () => {
-    if (!client) return
+    if (!client || isFetching) {
+      console.log('🚫 fetchActiveTransaction skipped: client?', !!client, 'isFetching?', isFetching)
+      return
+    }
 
     try {
-      setIsLoading(true)
+      console.log('🔄 fetchActiveTransaction starting (no loading state change)')
+      setIsFetching(true)
       setError(null)
       const transaction = await client.getActiveTransaction()
       
       // Only set active transaction if it's a valid non-zero transaction
       if (transaction && transaction.id !== '0' && parseInt(transaction.id) > 0) {
+        console.log('✅ Found valid active transaction:', transaction.id)
         setActiveTransaction(transaction)
       } else {
+        console.log('❌ No valid active transaction found')
         setActiveTransaction(null)
       }
     } catch (error) {
-      console.error('Error fetching active transaction:', error)
+      console.error('💥 Error fetching active transaction:', error)
       setError(error instanceof Error ? error.message : 'Failed to fetch transaction')
       setActiveTransaction(null)
     } finally {
-      setIsLoading(false)
+      console.log('✅ fetchActiveTransaction complete (no loading state change)')
+      setIsFetching(false)
     }
   }
 
   const handlePayment = async () => {
-    if (!stellarWallet.isConnected || !activeTransaction || !client) return
+    console.log('🚀 handlePayment called:', {
+      isConnected: stellarWallet.isConnected,
+      hasActiveTransaction: !!activeTransaction,
+      hasClient: !!client,
+      currentIsLoading: isLoading
+    })
+    
+    if (!stellarWallet.isConnected || !activeTransaction || !client) {
+      console.log('❌ Payment blocked - missing requirements')
+      return
+    }
 
     try {
+      console.log('⏳ Setting isLoading to true')
       setIsLoading(true)
       setError(null)
+      
+      console.log('💳 Calling payActiveTransaction...')
       await client.payActiveTransaction()
+      console.log('✅ Payment submitted successfully')
       toast.success('Payment submitted successfully!')
       
       // Refresh transaction status
+      console.log('🔄 Refreshing transaction status in 2 seconds...')
       setTimeout(fetchActiveTransaction, 2000)
     } catch (error) {
-      console.error('Error paying transaction:', error)
+      console.error('💥 Payment error:', error)
       setError(error instanceof Error ? error.message : 'Payment failed')
       toast.error('Payment failed')
     } finally {
+      console.log('✅ Setting isLoading to false')
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
+    console.log('🏗️ StellarUserPanel mounted')
+    return () => {
+      console.log('🏗️ StellarUserPanel unmounted')
+    }
+  }, [])
+
+  // Auto-reset loading state if stuck
+  useEffect(() => {
+    if (isLoading) {
+      console.log('⏰ isLoading is true, setting timeout to auto-reset in 30 seconds')
+      const timeout = setTimeout(() => {
+        console.log('⏰ Auto-resetting stuck loading state')
+        setIsLoading(false)
+      }, 30000) // Reset after 30 seconds if stuck
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [isLoading])
+
+  useEffect(() => {
     if (stellarWallet.isConnected) {
+      console.log('🔌 Wallet connected, starting initial fetch and polling')
       fetchActiveTransaction()
       fetchUserBalance()
       
-      // Set up polling for active transaction
-      const interval = setInterval(fetchActiveTransaction, 10000) // Every 10 seconds
-      return () => clearInterval(interval)
+      // Set up polling for active transaction - every 1 second for real-time updates
+      const interval = setInterval(() => {
+        console.log('⏰ Polling interval triggered')
+        fetchActiveTransaction()
+      }, 1000) // Every 1 second
+      
+      return () => {
+        console.log('🔌 Cleaning up polling interval')
+        clearInterval(interval)
+      }
+    } else {
+      console.log('🔌 Wallet not connected, clearing active transaction')
+      setActiveTransaction(null)
     }
   }, [stellarWallet.isConnected, client])
 
@@ -95,7 +150,18 @@ export const StellarUserPanel = () => {
     !activeTransaction.cancelled
 
   const getPaymentButtonContent = () => {
+    console.log('🔍 getPaymentButtonContent called:', {
+      isLoading,
+      isFetching,
+      activeTransaction: activeTransaction ? {
+        id: activeTransaction.id,
+        paid: activeTransaction.paid,
+        cancelled: activeTransaction.cancelled
+      } : null
+    })
+    
     if (isLoading) {
+      console.log('🟡 Button state: Processing payment (isLoading=true)')
       return (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -105,6 +171,7 @@ export const StellarUserPanel = () => {
     }
     
     if (activeTransaction?.paid) {
+      console.log('🟢 Button state: Paid')
       return (
         <>
           <CheckCircle className="w-4 h-4 mr-2" />
@@ -114,6 +181,7 @@ export const StellarUserPanel = () => {
     }
     
     if (activeTransaction?.cancelled) {
+      console.log('🔴 Button state: Cancelled')
       return (
         <>
           <XCircle className="w-4 h-4 mr-2" />
@@ -122,6 +190,7 @@ export const StellarUserPanel = () => {
       )
     }
     
+    console.log('🔵 Button state: Pay Transaction (normal)')
     return (
       <>
         <CreditCard className="w-4 h-4 mr-2" />
@@ -266,6 +335,21 @@ export const StellarUserPanel = () => {
                 variant={activeTransaction.paid ? "outline" : activeTransaction.cancelled ? "destructive" : "default"}
               >
                 {getPaymentButtonContent()}
+              </Button>
+              
+              {/* Debug Reset Button - TEMPORARY */}
+              <Button
+                onClick={() => {
+                  console.log('🔧 Manual reset triggered')
+                  setIsLoading(false)
+                  setIsFetching(false)
+                  setError(null)
+                }}
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+              >
+                🔧 Reset All States (Debug)
               </Button>
             </div>
           )}

@@ -23,6 +23,13 @@ export const StellarUserPanel = () => {
     ? new StellarContractClient(networkConfig.contractAddress, networkConfig.rpcUrl)
     : null
 
+  // Reset payment loading state when wallet disconnects or client changes
+  useEffect(() => {
+    if (!stellarWallet.isConnected || !client) {
+      setIsPaymentLoading(false);
+    }
+  }, [stellarWallet.isConnected, client]);
+
   const fetchUserBalance = async () => {
     try {
       if (stellarWallet.isConnected && stellarWallet.address) {
@@ -67,8 +74,17 @@ export const StellarUserPanel = () => {
   }
 
   const handlePayment = async () => {
-    console.log('handlePayment called');
-    if (!stellarWallet.isConnected || !activeTransaction || !client || isPaymentLoading) return
+    console.log('handlePayment called with state:', { 
+      isConnected: stellarWallet.isConnected, 
+      hasActiveTransaction: !!activeTransaction, 
+      hasClient: !!client, 
+      isPaymentLoading 
+    });
+    
+    if (!stellarWallet.isConnected || !activeTransaction || !client || isPaymentLoading) {
+      console.log('Early return from handlePayment due to conditions');
+      return;
+    }
 
     if (isPaymentLoading) {
       console.log('Already processing payment, preventing duplicate call');
@@ -76,9 +92,11 @@ export const StellarUserPanel = () => {
     }
 
     try {
+      console.log('Starting payment process, setting isPaymentLoading to true');
       setIsPaymentLoading(true)
       setError(null)
       await client.payActiveTransaction()
+      console.log('Payment completed successfully');
       toast.success('Payment submitted successfully!')
       
       // Refresh transaction status after a longer delay
@@ -88,6 +106,7 @@ export const StellarUserPanel = () => {
       setError(error instanceof Error ? error.message : 'Payment failed')
       toast.error('Payment failed')
     } finally {
+      console.log('Setting isPaymentLoading to false in finally block');
       setIsPaymentLoading(false)
     }
   }
@@ -103,6 +122,11 @@ export const StellarUserPanel = () => {
     }
   }, [stellarWallet.isConnected, client])
 
+  // Debug logging for payment loading state
+  useEffect(() => {
+    console.log('isPaymentLoading changed to:', isPaymentLoading);
+  }, [isPaymentLoading])
+
   // Stable transaction validation to prevent button flickering
   const isValidActiveTx = React.useMemo(() => {
     return activeTransaction && 
@@ -114,6 +138,12 @@ export const StellarUserPanel = () => {
 
   // Memoize button content to prevent unnecessary re-renders
   const getPaymentButtonContent = React.useCallback(() => {
+    console.log('getPaymentButtonContent called with:', { 
+      isPaymentLoading, 
+      paid: activeTransaction?.paid, 
+      cancelled: activeTransaction?.cancelled 
+    });
+    
     if (isPaymentLoading) {
       return (
         <>
@@ -196,6 +226,20 @@ export const StellarUserPanel = () => {
             >
               <RefreshCw className="w-4 h-4" />
             </Button>
+            {/* Temporary debug button - remove after testing */}
+            {isPaymentLoading && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  console.log('Manual reset of payment loading state');
+                  setIsPaymentLoading(false);
+                }}
+                className="ml-2 text-xs"
+              >
+                Reset
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

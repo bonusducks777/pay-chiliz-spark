@@ -80,11 +80,11 @@ export const TronUserPanel = () => {
       fetchActiveTransaction();
       fetchUserBalance();
       
-      // Refresh every 10 seconds
+      // Refresh every 1 second for real-time updates
       const interval = setInterval(() => {
         fetchActiveTransaction();
         fetchUserBalance();
-      }, 10000);
+      }, 1000);
       return () => clearInterval(interval);
     }
   }, [isConnected]);

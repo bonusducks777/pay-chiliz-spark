@@ -61,7 +61,7 @@ export const UniversalTransactionStatus = () => {
       }
       
       fetchStellarData()
-      const interval = setInterval(fetchStellarData, 2000) // More frequent polling for better responsiveness
+      const interval = setInterval(fetchStellarData, 1000) // Every 1 second for real-time updates
       return () => clearInterval(interval)
     } else {
       // Reset when client is not available
@@ -85,7 +85,7 @@ export const UniversalTransactionStatus = () => {
       }
       
       fetchTronData()
-      const interval = setInterval(fetchTronData, 5000) // Reduced from 2000 to 5000ms
+      const interval = setInterval(fetchTronData, 1000) // Every 1 second for real-time updates
       return () => clearInterval(interval)
     } else {
       // Reset when client is not available

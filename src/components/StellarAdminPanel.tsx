@@ -234,7 +234,7 @@ export const StellarAdminPanel = () => {
       fetchActiveTransaction();
       
       // Set up polling for active transaction updates with faster frequency for responsiveness
-      const interval = setInterval(fetchActiveTransaction, 3000); // Every 3 seconds like EVM
+      const interval = setInterval(fetchActiveTransaction, 1000); // Every 1 second for real-time updates
       return () => clearInterval(interval);
     }
   }, [isConnected, address]); // Removed 'client' from dependencies
