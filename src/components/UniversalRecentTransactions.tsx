@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ItemizedTable } from '@/components/ui/itemized-table'
-import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getSupportedTokens, getChainInfo } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { Clock, CheckCircle, XCircle } from 'lucide-react'
 import { StellarContractClient } from '@/lib/stellar-contract'
@@ -16,6 +16,7 @@ import { useNetwork } from '@/lib/network-context'
 export const UniversalRecentTransactions = () => {
   const { isEVM, isStellar, isTron, networkConfig } = useNetwork()
   const chainId = useChainId()
+  const chainInfo = getChainInfo(chainId)
   
   // EVM Data
   const contractAddress = CONTRACTS[chainId] as `0x${string}`;
@@ -182,7 +183,7 @@ export const UniversalRecentTransactions = () => {
           const formattedAmount = (BigInt(amount.toString()) / divisor).toString()
           return `${formattedAmount} ${token.symbol}`
         }
-        return `${formatEther(BigInt(amount.toString()))} CHZ`
+        return `${formatEther(BigInt(amount.toString()))} ${chainInfo.symbol}`
       } catch (error) {
         console.error('Error formatting amount:', error)
         return '0'

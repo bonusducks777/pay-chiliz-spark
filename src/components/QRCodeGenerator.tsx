@@ -10,6 +10,7 @@ interface QRCodeGeneratorProps {
 
 const chainNames: Record<number, string> = {
   88882: 'chiliz', // Chiliz Spicy testnet
+  28525: 'circle-layer', // Circle Layer testnet
   56: 'bsc',       // BSC mainnet
   1: 'ethereum',   // Ethereum mainnet
 };

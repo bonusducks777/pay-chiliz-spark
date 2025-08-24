@@ -91,6 +91,21 @@ export function getSupportedTokens(chainId: number) {
   return SUPPORTED_TOKENS[chainId] || SUPPORTED_TOKENS[chilizSpicy.id];
 }
 
+export function getChainInfo(chainId: number) {
+  if (chainId === chilizSpicy.id) {
+    return { name: 'Chiliz Spicy Testnet', symbol: 'CHZ', decimals: 18 };
+  } else if (chainId === circleLayerTestnet.id) {
+    return { name: 'Circle Layer Testnet', symbol: 'CLAYER', decimals: 18 };
+  } else if (chainId === bsc.id) {
+    return { name: 'BSC', symbol: 'BNB', decimals: 18 };
+  } else if (chainId === mainnet.id) {
+    return { name: 'Ethereum', symbol: 'ETH', decimals: 18 };
+  } else {
+    // Default to Chiliz
+    return { name: 'Chiliz Spicy Testnet', symbol: 'CHZ', decimals: 18 };
+  }
+}
+
 export const config = getDefaultConfig({
   appName: 'Payment Terminal',
   projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1',

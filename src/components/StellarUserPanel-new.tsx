@@ -5,7 +5,7 @@ import { ItemizedTable } from '@/components/ui/itemized-table'
 import { useNetwork } from '@/lib/network-context'
 import { useStellarWallet } from '@/hooks/use-stellar-wallet'
 import { StellarContractClient } from '@/lib/stellar-contract'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { CreditCard, Loader2, CheckCircle, AlertTriangle, XCircle, Wallet, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +13,8 @@ import { toast } from 'sonner'
 export const StellarUserPanel = () => {
   const { networkConfig } = useNetwork()
   const stellarWallet = useStellarWallet()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false) // For background operations like fetching
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false) // For payment button specifically
   const [error, setError] = useState<string | null>(null)
   const [activeTransaction, setActiveTransaction] = useState<any>(null)
   const [userBalance, setUserBalance] = useState<string>('0')
@@ -38,13 +39,23 @@ export const StellarUserPanel = () => {
     if (!client) return
 
     try {
-      setIsLoading(true)
       setError(null)
       const transaction = await client.getActiveTransaction()
       
       // Only set active transaction if it's a valid non-zero transaction
       if (transaction && transaction.id !== '0' && parseInt(transaction.id) > 0) {
-        setActiveTransaction(transaction)
+        // Only update if the transaction has actually changed
+        setActiveTransaction(prevTx => {
+          if (!prevTx || 
+              prevTx.id !== transaction.id || 
+              prevTx.paid !== transaction.paid || 
+              prevTx.cancelled !== transaction.cancelled ||
+              prevTx.amount !== transaction.amount ||
+              prevTx.description !== transaction.description) {
+            return transaction
+          }
+          return prevTx // Keep the same object reference if nothing changed
+        })
       } else {
         setActiveTransaction(null)
       }
@@ -52,28 +63,32 @@ export const StellarUserPanel = () => {
       console.error('Error fetching active transaction:', error)
       setError(error instanceof Error ? error.message : 'Failed to fetch transaction')
       setActiveTransaction(null)
-    } finally {
-      setIsLoading(false)
     }
   }
 
   const handlePayment = async () => {
-    if (!stellarWallet.isConnected || !activeTransaction || !client) return
+    console.log('handlePayment called');
+    if (!stellarWallet.isConnected || !activeTransaction || !client || isPaymentLoading) return
+
+    if (isPaymentLoading) {
+      console.log('Already processing payment, preventing duplicate call');
+      return;
+    }
 
     try {
-      setIsLoading(true)
+      setIsPaymentLoading(true)
       setError(null)
       await client.payActiveTransaction()
       toast.success('Payment submitted successfully!')
       
-      // Refresh transaction status
-      setTimeout(fetchActiveTransaction, 2000)
+      // Refresh transaction status after a longer delay
+      setTimeout(fetchActiveTransaction, 5000)
     } catch (error) {
       console.error('Error paying transaction:', error)
       setError(error instanceof Error ? error.message : 'Payment failed')
       toast.error('Payment failed')
     } finally {
-      setIsLoading(false)
+      setIsPaymentLoading(false)
     }
   }
 
@@ -82,20 +97,24 @@ export const StellarUserPanel = () => {
       fetchActiveTransaction()
       fetchUserBalance()
       
-      // Set up polling for active transaction
-      const interval = setInterval(fetchActiveTransaction, 10000) // Every 10 seconds
+      // Reduce polling frequency to prevent glitching
+      const interval = setInterval(fetchActiveTransaction, 15000) // Every 15 seconds instead of 10
       return () => clearInterval(interval)
     }
   }, [stellarWallet.isConnected, client])
 
-  const isValidActiveTx = activeTransaction && 
-    activeTransaction.id !== '0' && 
-    parseInt(activeTransaction.id) > 0 &&
-    !activeTransaction.paid &&
-    !activeTransaction.cancelled
+  // Stable transaction validation to prevent button flickering
+  const isValidActiveTx = React.useMemo(() => {
+    return activeTransaction && 
+      activeTransaction.id !== '0' && 
+      parseInt(activeTransaction.id) > 0 &&
+      !activeTransaction.paid &&
+      !activeTransaction.cancelled
+  }, [activeTransaction?.id, activeTransaction?.paid, activeTransaction?.cancelled])
 
-  const getPaymentButtonContent = () => {
-    if (isLoading) {
+  // Memoize button content to prevent unnecessary re-renders
+  const getPaymentButtonContent = React.useCallback(() => {
+    if (isPaymentLoading) {
       return (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -128,7 +147,7 @@ export const StellarUserPanel = () => {
         Pay Transaction
       </>
     )
-  }
+  }, [isPaymentLoading, activeTransaction?.paid, activeTransaction?.cancelled])
 
   if (!stellarWallet.isConnected) {
     return (
@@ -262,7 +281,7 @@ export const StellarUserPanel = () => {
               <Button
                 onClick={handlePayment}
                 className="w-full"
-                disabled={isLoading || !activeTransaction || activeTransaction.paid || activeTransaction.cancelled}
+                disabled={isPaymentLoading || !activeTransaction || activeTransaction.paid || activeTransaction.cancelled}
                 variant={activeTransaction.paid ? "outline" : activeTransaction.cancelled ? "destructive" : "default"}
               >
                 {getPaymentButtonContent()}

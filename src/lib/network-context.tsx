@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 export type NetworkType = 'evm' | 'stellar' | 'tron';
 
@@ -18,6 +18,12 @@ export const NETWORK_CONFIGS: Record<string, NetworkConfig> = {
     name: 'Chiliz Spicy Testnet',
     icon: '🌶️',
     chainId: 88882,
+  },
+  'circle-layer': {
+    type: 'evm',
+    name: 'Circle Layer Testnet',
+    icon: '🔵',
+    chainId: 28525,
   },
   'bsc': {
     type: 'evm',
@@ -62,6 +68,8 @@ interface NetworkContextType {
   isEVM: boolean;
   isStellar: boolean;
   isTron: boolean;
+  chainId?: number;
+  setChainId: (chainId: number) => void;
 }
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
@@ -80,10 +88,35 @@ interface NetworkProviderProps {
 
 export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) => {
   const [currentNetwork, setCurrentNetwork] = useState('evm-group');
+  const [chainId, setChainId] = useState<number | undefined>(undefined);
   
-  // Handle the evm-group selection by defaulting to chiliz-spicy
-  const actualNetwork = currentNetwork === 'evm-group' ? 'chiliz-spicy' : currentNetwork;
-  const networkConfig = NETWORK_CONFIGS[actualNetwork] || NETWORK_CONFIGS['chiliz-spicy'];
+  // Handle the evm-group selection by using the actual connected chain
+  let actualNetwork: string;
+  let networkConfig: NetworkConfig;
+  
+  if (currentNetwork === 'evm-group') {
+    // For EVM networks, use the connected chain to determine the network config
+    if (chainId === 88882) {
+      actualNetwork = 'chiliz-spicy';
+      networkConfig = NETWORK_CONFIGS['chiliz-spicy'];
+    } else if (chainId === 28525) {
+      actualNetwork = 'circle-layer';
+      networkConfig = NETWORK_CONFIGS['circle-layer'];
+    } else if (chainId === 56) {
+      actualNetwork = 'bsc';
+      networkConfig = NETWORK_CONFIGS['bsc'];
+    } else if (chainId === 1) {
+      actualNetwork = 'ethereum';
+      networkConfig = NETWORK_CONFIGS['ethereum'];
+    } else {
+      // Default to chiliz-spicy if unknown chain or no chain connected
+      actualNetwork = 'chiliz-spicy';
+      networkConfig = NETWORK_CONFIGS['chiliz-spicy'];
+    }
+  } else {
+    actualNetwork = currentNetwork;
+    networkConfig = NETWORK_CONFIGS[actualNetwork] || NETWORK_CONFIGS['chiliz-spicy'];
+  }
   
   const isEVM = networkConfig.type === 'evm' || currentNetwork === 'evm-group';
   const isStellar = networkConfig.type === 'stellar';
@@ -98,6 +131,8 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
         isEVM,
         isStellar,
         isTron,
+        chainId,
+        setChainId,
       }}
     >
       {children}

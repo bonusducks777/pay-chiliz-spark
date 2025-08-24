@@ -18,6 +18,7 @@ import { UniversalConnectButton } from './UniversalConnectButton'
 import { TronConnectButton } from './TronConnectButton'
 import { TronUserPanel } from './TronUserPanel'
 import { TronAdminPanel } from './TronAdminPanel'
+import { ChainSyncer } from './ChainSyncer'
 import { useNetwork } from '@/lib/network-context'
 import { useStellarWallet } from '@/hooks/use-stellar-wallet'
 import { useTronWallet } from '@/hooks/use-tron-wallet'
@@ -125,6 +126,9 @@ export const PaymentTerminal = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-terminal-bg to-background">
+      {/* Sync wagmi chainId with network context */}
+      {isEVM && <ChainSyncer />}
+      
       {/* Background glow effect */}
       <div className="fixed inset-0 bg-gradient-glow pointer-events-none" />
       <div className="relative z-10 container mx-auto px-4 py-8">

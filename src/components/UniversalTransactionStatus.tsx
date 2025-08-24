@@ -23,7 +23,7 @@ export const UniversalTransactionStatus = () => {
     abi: CONTRACT_ABI,
     functionName: 'getActiveTransactionFields',
     query: {
-      refetchInterval: 2000,
+      refetchInterval: 5000, // Reduced from 2000 to 5000ms
       enabled: isEVM && !!contractAddress
     }
   })
@@ -49,15 +49,22 @@ export const UniversalTransactionStatus = () => {
       const fetchStellarData = async () => {
         try {
           const tx = await stellarClient.getActiveTransaction()
-          setStellarTransaction(tx)
+          // Only update if we got valid data or null (no active transaction)
+          if (tx !== undefined) {
+            setStellarTransaction(tx)
+          }
         } catch (error) {
           console.error('Failed to fetch Stellar transaction:', error)
+          // Don't reset transaction on error, keep previous state
         }
       }
       
       fetchStellarData()
-      const interval = setInterval(fetchStellarData, 2000)
+      const interval = setInterval(fetchStellarData, 5000) // Reduced from 2000 to 5000ms
       return () => clearInterval(interval)
+    } else {
+      // Reset when client is not available
+      setStellarTransaction(null)
     }
   }, [stellarClient])
 
@@ -66,27 +73,45 @@ export const UniversalTransactionStatus = () => {
       const fetchTronData = async () => {
         try {
           const tx = await tronClient.getActiveTransaction()
-          setTronTransaction(tx)
+          // Only update if we got valid data or null (no active transaction)
+          if (tx !== undefined) {
+            setTronTransaction(tx)
+          }
         } catch (error) {
           console.error('Failed to fetch Tron transaction:', error)
+          // Don't reset transaction on error, keep previous state
         }
       }
       
       fetchTronData()
-      const interval = setInterval(fetchTronData, 2000)
+      const interval = setInterval(fetchTronData, 5000) // Reduced from 2000 to 5000ms
       return () => clearInterval(interval)
+    } else {
+      // Reset when client is not available
+      setTronTransaction(null)
     }
   }, [tronClient])
 
-  // Universal transaction data
+  // Universal transaction data with improved validation
   const transaction = isEVM ? activeTransaction : (isStellar ? stellarTransaction : tronTransaction)
-  const isValidActiveTx = isEVM 
-    ? Array.isArray(activeTransaction) && activeTransaction.length >= 11 && activeTransaction[0] > 0n
-    : isStellar 
-      ? stellarTransaction !== null && stellarTransaction.id !== '0'
-      : isTron
-        ? tronTransaction !== null && tronTransaction.id !== '0' && parseInt(tronTransaction.id) > 0
-        : false
+  const isValidActiveTx = React.useMemo(() => {
+    if (isEVM) {
+      return Array.isArray(activeTransaction) && activeTransaction.length >= 11 && activeTransaction[0] > 0n
+    } else if (isStellar) {
+      return stellarTransaction !== null && 
+             stellarTransaction.id !== '0' && 
+             parseInt(stellarTransaction.id) > 0 &&
+             !stellarTransaction.paid &&
+             !stellarTransaction.cancelled
+    } else if (isTron) {
+      return tronTransaction !== null && 
+             tronTransaction.id !== '0' && 
+             parseInt(tronTransaction.id) > 0 &&
+             !tronTransaction.paid &&
+             !tronTransaction.cancelled
+    }
+    return false
+  }, [isEVM, isStellar, isTron, activeTransaction, stellarTransaction, tronTransaction])
 
   const getStatusIcon = () => {
     if (!isValidActiveTx) return Clock

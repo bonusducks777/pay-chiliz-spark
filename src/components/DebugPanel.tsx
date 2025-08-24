@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { CONTRACTS, CONTRACT_ABI } from '@/lib/wagmi'
+import { CONTRACTS, CONTRACT_ABI, getChainInfo } from '@/lib/wagmi'
 import { useChainId } from 'wagmi'
 import { useNetwork } from '@/lib/network-context'
 import { useStellarWallet } from '@/hooks/use-stellar-wallet'
@@ -20,6 +20,7 @@ export const DebugPanel = () => {
   const stellarWallet = useStellarWallet()
   const tronWallet = useTronWallet()
   const chainId = useChainId();
+  const chainInfo = getChainInfo(chainId);
   
   // EVM Contract data
   const contractAddress = isEVM ? CONTRACTS[chainId] as `0x${string}` : undefined;
@@ -202,7 +203,7 @@ export const DebugPanel = () => {
     { name: 'MAX_RECENT_TX', description: 'Maximum recent transactions stored', data: maxRecentTx },
     { name: 'activeTransaction', description: 'Current active transaction details', data: activeTransaction },
     { name: 'paymentStatus', description: 'Payment status of active transaction', data: paymentStatus },
-    { name: 'contractBalance', description: 'Current contract balance (CHZ)', data: contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ' },
+    { name: 'contractBalance', description: `Current contract balance (${chainInfo.symbol})`, data: contractBalance ? `${Number(contractBalance) / 1e18} ${chainInfo.symbol}` : `0.000 ${chainInfo.symbol}` },
   ] : isStellar ? [
     { name: 'contractId', description: 'Stellar contract ID', data: networkConfig.contractAddress },
     { name: 'rpcUrl', description: 'Stellar RPC endpoint', data: networkConfig.rpcUrl },
@@ -533,7 +534,7 @@ export const DebugPanel = () => {
                   <span className="text-sm text-muted-foreground">Contract Balance</span>
                   <div className="font-mono text-sm bg-secondary/30 p-2 rounded border">
                     {isEVM 
-                      ? (contractBalance ? `${Number(contractBalance) / 1e18} CHZ` : '0.000 CHZ')
+                      ? (contractBalance ? `${Number(contractBalance) / 1e18} ${chainInfo.symbol}` : `0.000 ${chainInfo.symbol}`)
                       : isStellar 
                         ? (stellarData?.contractBalance ? `${Number(stellarData.contractBalance) / 1e7} XLM` : '0.000 XLM')
                         : isTron
