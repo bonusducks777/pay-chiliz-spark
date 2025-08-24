@@ -16,6 +16,7 @@ export const TronUserPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<string>('0');
+  const [isFetching, setIsFetching] = useState(false); // Separate state for data fetching
 
   const client = new TronContractClient(
     networkConfig.contractAddress || '',
@@ -37,42 +38,136 @@ export const TronUserPanel = () => {
   };
 
   const fetchActiveTransaction = async () => {
+    if (isFetching) {
+      console.log('🚫 Tron fetchActiveTransaction skipped: already fetching');
+      return;
+    }
+
     try {
-      setIsLoading(true);
+      console.log('🔄 Tron fetchActiveTransaction starting (no loading state change)');
+      setIsFetching(true);
       setError(null);
       const transaction = await client.getActiveTransaction();
       
       // Only set active transaction if it's a valid non-zero transaction
       if (transaction && transaction.id !== '0' && parseInt(transaction.id) > 0) {
+        console.log('✅ Tron found valid active transaction:', transaction.id);
         setActiveTransaction(transaction);
       } else {
+        console.log('❌ Tron no valid active transaction found');
         setActiveTransaction(null);
       }
     } catch (error) {
-      console.error('Error fetching active transaction:', error);
+      console.error('💥 Tron error fetching active transaction:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch transaction');
       setActiveTransaction(null);
     } finally {
-      setIsLoading(false);
+      console.log('✅ Tron fetchActiveTransaction complete');
+      setIsFetching(false);
     }
   };
 
   const handlePayment = async () => {
-    if (!isConnected || !activeTransaction) return;
+    console.log('🚀 Tron handlePayment called:', {
+      isConnected,
+      hasActiveTransaction: !!activeTransaction,
+      currentIsLoading: isLoading
+    });
+    
+    if (!isConnected || !activeTransaction) {
+      console.log('❌ Tron payment blocked - missing requirements');
+      return;
+    }
 
     try {
+      console.log('⏳ Tron setting isLoading to true');
       setIsLoading(true);
       setError(null);
+      
+      console.log('💳 Tron calling payActiveTransaction...');
       await client.payActiveTransaction();
+      console.log('✅ Tron payment submitted successfully');
       
       // Refresh transaction status
+      console.log('🔄 Tron refreshing transaction status in 2 seconds...');
       setTimeout(fetchActiveTransaction, 2000);
     } catch (error) {
-      console.error('Error paying transaction:', error);
+      console.error('💥 Tron payment error:', error);
       setError(error instanceof Error ? error.message : 'Payment failed');
     } finally {
+      console.log('✅ Tron setting isLoading to false');
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    console.log('🏗️ TronUserPanel mounted');
+    return () => {
+      console.log('🏗️ TronUserPanel unmounted');
+    }
+  }, []);
+
+  // Auto-reset loading state if stuck
+  useEffect(() => {
+    if (isLoading) {
+      console.log('⏰ Tron isLoading is true, setting timeout to auto-reset in 30 seconds');
+      const timeout = setTimeout(() => {
+        console.log('⏰ Tron auto-resetting stuck loading state');
+        setIsLoading(false);
+      }, 30000); // Reset after 30 seconds if stuck
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading]);
+
+  const getPaymentButtonContent = () => {
+    console.log('🔍 Tron getPaymentButtonContent called:', {
+      isLoading,
+      isFetching,
+      activeTransaction: activeTransaction ? {
+        id: activeTransaction.id,
+        paid: activeTransaction.paid,
+        cancelled: activeTransaction.cancelled
+      } : null
+    });
+    
+    if (isLoading) {
+      console.log('🟡 Tron button state: Processing payment (isLoading=true)');
+      return (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Processing...
+        </>
+      );
+    }
+    
+    if (activeTransaction?.paid) {
+      console.log('🟢 Tron button state: Paid');
+      return (
+        <>
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Paid
+        </>
+      );
+    }
+    
+    if (activeTransaction?.cancelled) {
+      console.log('🔴 Tron button state: Cancelled');
+      return (
+        <>
+          <XCircle className="w-4 h-4 mr-2" />
+          Cancelled
+        </>
+      );
+    }
+    
+    console.log('🔵 Tron button state: Pay Transaction (normal)');
+    return (
+      <>
+        <CreditCard className="w-4 h-4 mr-2" />
+        Pay {activeTransaction?.amount} TRX
+      </>
+    );
   };
 
   useEffect(() => {
@@ -225,24 +320,31 @@ export const TronUserPanel = () => {
               </div>
 
               {!activeTransaction.paid && !activeTransaction.cancelled && (
-                <Button 
-                  onClick={handlePayment} 
-                  disabled={isLoading}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Pay {activeTransaction.amount} TRX
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button 
+                    onClick={handlePayment} 
+                    disabled={isLoading}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {getPaymentButtonContent()}
+                  </Button>
+                  
+                  {/* Debug Reset Button - TEMPORARY */}
+                  <Button
+                    onClick={() => {
+                      console.log('🔧 Tron manual reset triggered');
+                      setIsLoading(false);
+                      setIsFetching(false);
+                      setError(null);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                  >
+                    🔧 Reset Tron States (Debug)
+                  </Button>
+                </>
               )}
             </>
           ) : (
