@@ -132,6 +132,9 @@ export const StellarAdminPanel = () => {
         formData.requestedTokenContract
       );
       
+      // Show success notification
+      toast.success('Transaction created successfully!');
+      
       // Reset form
       setFormData({
         amount: '',
@@ -140,8 +143,11 @@ export const StellarAdminPanel = () => {
       });
       setItemizedItems([]);
       
-      // Refresh transaction data
-      setTimeout(fetchActiveTransaction, 2000);
+      // Refresh transaction data immediately for immediate UI update
+      fetchActiveTransaction();
+      
+      // Also schedule a secondary refresh for safety
+      setTimeout(fetchActiveTransaction, 1000);
     } catch (error) {
       console.error('Error creating transaction:', error);
       setError(error instanceof Error ? error.message : 'Failed to create transaction');
@@ -227,8 +233,8 @@ export const StellarAdminPanel = () => {
       checkOwnership();
       fetchActiveTransaction();
       
-      // Set up polling for active transaction updates, but less frequently
-      const interval = setInterval(fetchActiveTransaction, 15000); // Every 15 seconds
+      // Set up polling for active transaction updates with faster frequency for responsiveness
+      const interval = setInterval(fetchActiveTransaction, 3000); // Every 3 seconds like EVM
       return () => clearInterval(interval);
     }
   }, [isConnected, address]); // Removed 'client' from dependencies

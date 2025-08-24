@@ -239,7 +239,7 @@ export class StellarContractClient {
       let tokenAddress: string;
       if (tokenContract === 'native' || tokenContract === '') {
         // Use the well-known native XLM contract address on Stellar testnet
-        tokenAddress = 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT';
+        tokenAddress = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
       } else {
         tokenAddress = tokenContract;
       }
@@ -402,7 +402,7 @@ export class StellarContractClient {
       if (tokenContract === 'native' || tokenContract === '') {
         // Use the well-known native XLM contract address on Stellar testnet
         // This is the Stellar Asset Contract (SAC) for native XLM
-        tokenAddress = 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT';
+        tokenAddress = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
       } else {
         tokenAddress = tokenContract;
       }
@@ -810,7 +810,7 @@ export class StellarContractClient {
       let tokenAddress: string;
       if (tokenContract === 'native' || tokenContract === '') {
         // Use the well-known native XLM contract address on Stellar testnet
-        tokenAddress = 'CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT';
+        tokenAddress = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
       } else {
         tokenAddress = tokenContract;
       }

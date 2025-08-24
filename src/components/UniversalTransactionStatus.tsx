@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ItemizedTable } from '@/components/ui/itemized-table'
 import { CONTRACTS, CONTRACT_ABI, getSupportedTokens } from '@/lib/wagmi'
-import { StellarContractClient, STELLAR_TOKENS } from '@/lib/stellar-contract'
+import { StellarContractClient, STELLAR_TOKENS } from '@/lib/stellar-contract-new'
 import { TronContractClient } from '@/lib/tron-contract'
 import { useNetwork } from '@/lib/network-context'
 import { Activity, CheckCircle, XCircle, Clock } from 'lucide-react'
@@ -49,6 +49,7 @@ export const UniversalTransactionStatus = () => {
       const fetchStellarData = async () => {
         try {
           const tx = await stellarClient.getActiveTransaction()
+          console.log('UniversalTransactionStatus - Stellar transaction data:', tx)
           // Only update if we got valid data or null (no active transaction)
           if (tx !== undefined) {
             setStellarTransaction(tx)
@@ -60,7 +61,7 @@ export const UniversalTransactionStatus = () => {
       }
       
       fetchStellarData()
-      const interval = setInterval(fetchStellarData, 5000) // Reduced from 2000 to 5000ms
+      const interval = setInterval(fetchStellarData, 2000) // More frequent polling for better responsiveness
       return () => clearInterval(interval)
     } else {
       // Reset when client is not available
@@ -98,17 +99,16 @@ export const UniversalTransactionStatus = () => {
     if (isEVM) {
       return Array.isArray(activeTransaction) && activeTransaction.length >= 11 && activeTransaction[0] > 0n
     } else if (isStellar) {
+      console.log('UniversalTransactionStatus - validating Stellar transaction:', stellarTransaction)
+      // Show any transaction that exists, regardless of paid/cancelled status
       return stellarTransaction !== null && 
              stellarTransaction.id !== '0' && 
-             parseInt(stellarTransaction.id) > 0 &&
-             !stellarTransaction.paid &&
-             !stellarTransaction.cancelled
+             parseInt(stellarTransaction.id) > 0
     } else if (isTron) {
+      // Show any transaction that exists, regardless of paid/cancelled status
       return tronTransaction !== null && 
              tronTransaction.id !== '0' && 
-             parseInt(tronTransaction.id) > 0 &&
-             !tronTransaction.paid &&
-             !tronTransaction.cancelled
+             parseInt(tronTransaction.id) > 0
     }
     return false
   }, [isEVM, isStellar, isTron, activeTransaction, stellarTransaction, tronTransaction])
@@ -148,7 +148,7 @@ export const UniversalTransactionStatus = () => {
       if (tronTransaction?.paid) return 'Paid'
       return 'Pending Payment'
     }
-    return 'Unknown Status'
+    return 'Active Transaction'
   }
 
   const getStatusColor = () => {
@@ -189,7 +189,7 @@ export const UniversalTransactionStatus = () => {
       const token = supportedTokens.find(t => t.address.toLowerCase() === tokenAddress?.toLowerCase())
       return token?.symbol || 'Unknown'
     } else if (isStellar) {
-      const tokenContract = stellarTransaction?.requested_token_contract
+      const tokenContract = stellarTransaction?.requestedTokenContract
       const token = STELLAR_TOKENS.find(t => t.address === tokenContract)
       return token?.symbol || 'XLM'
     } else if (isTron) {
@@ -277,7 +277,7 @@ export const UniversalTransactionStatus = () => {
                     {isEVM 
                       ? activeTransaction[7]
                       : isStellar
-                        ? stellarTransaction?.merchant_name
+                        ? stellarTransaction?.merchantName
                         : isTron
                           ? tronTransaction?.merchantName
                           : 'N/A'
@@ -290,7 +290,7 @@ export const UniversalTransactionStatus = () => {
                     {isEVM 
                       ? activeTransaction[8]
                       : isStellar
-                        ? stellarTransaction?.merchant_location
+                        ? stellarTransaction?.merchantLocation
                         : isTron
                           ? tronTransaction?.merchantLocation
                           : 'N/A'
@@ -316,14 +316,14 @@ export const UniversalTransactionStatus = () => {
 
               {/* Items */}
               {((isEVM && activeTransaction[9]) || 
-                (isStellar && stellarTransaction?.itemized_list) || 
+                (isStellar && stellarTransaction?.itemizedList) || 
                 (isTron && tronTransaction?.itemizedList)) && (
                 <ItemizedTable 
                   itemizedList={
                     isEVM 
                       ? activeTransaction[9]
                       : isStellar
-                        ? stellarTransaction?.itemized_list || '[]'
+                        ? stellarTransaction?.itemizedList || '[]'
                         : isTron
                           ? tronTransaction?.itemizedList || '[]'
                           : '[]'

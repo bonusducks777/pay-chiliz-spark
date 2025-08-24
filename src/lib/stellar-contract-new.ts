@@ -228,7 +228,7 @@ export class StellarContractClient {
       console.log('Fetching contract balance from Soroban contract:', this.contractAddress, tokenContract);
       
       const tokenAddress = tokenContract === 'native' 
-        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' 
         : tokenContract;
       
       const operation = this.contract.call(
@@ -288,7 +288,7 @@ export class StellarContractClient {
       
       // Create contract invocation for set_active_transaction
       const tokenAddress = tokenContract === 'native' 
-        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' 
         : tokenContract;
       
       const operation = this.contract.call(
@@ -398,7 +398,7 @@ export class StellarContractClient {
       const userAddress = await this.ensureConnection();
       
       const tokenAddress = tokenContract === 'native' 
-        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCYUPX' 
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' 
         : tokenContract;
       
       // Create contract invocation for withdraw
