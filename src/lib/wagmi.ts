@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi'
-import { chiliz, bsc, mainnet } from 'wagmi/chains'
+import { chiliz, bsc, mainnet, avalancheFuji } from 'wagmi/chains'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import PaymentTerminalERC20ABI from './PaymentTerminalERC20.abi.json'
 
@@ -51,6 +51,7 @@ export const CONTRACTS = {
   [circleLayerTestnet.id]: '0x7AeE0CbBcd0e5257931f7dC87F0345C1bB2aab39',
   [bsc.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real BSC contract
   [mainnet.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real ETH contract
+  [avalancheFuji.id]: '0xFb3D22A7faAeF73CCec677658771083D55e38dC0', // Avalanche C-Chain Fuji Testnet
 }
 
 // Supported tokens per chain (native + 3 ERC20s)
@@ -85,6 +86,12 @@ export const SUPPORTED_TOKENS: Record<number, Array<{
     { shortcode: 'dai', address: '0x8888888888888888888888888888888888888888', name: 'Dai Stablecoin', symbol: 'DAI', decimals: 18 },
     { shortcode: 'uni', address: '0x9999999999999999999999999999999999999999', name: 'Uniswap', symbol: 'UNI', decimals: 18 },
   ],
+  [avalancheFuji.id]: [
+    { shortcode: 'native', address: '0x0000000000000000000000000000000000000000', name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+    { shortcode: 'usdc', address: '0x5425890298aed601595a70AB815c96711a31Bc65', name: 'USD Coin', symbol: 'USDC.e', decimals: 6 },
+    { shortcode: 'usdt', address: '0x1f1Be82E0317b18B38f80a37160C0F6F78FaF95e', name: 'Tether USD', symbol: 'USDT.e', decimals: 6 },
+    { shortcode: 'wavax', address: '0xd00ae08403B9bbb9124bB305C09058E32C39A48c', name: 'Wrapped AVAX', symbol: 'WAVAX', decimals: 18 },
+  ],
 }
 
 export function getSupportedTokens(chainId: number) {
@@ -100,6 +107,8 @@ export function getChainInfo(chainId: number) {
     return { name: 'BSC', symbol: 'BNB', decimals: 18 };
   } else if (chainId === mainnet.id) {
     return { name: 'Ethereum', symbol: 'ETH', decimals: 18 };
+  } else if (chainId === avalancheFuji.id) {
+    return { name: 'Avalanche Fuji Testnet', symbol: 'AVAX', decimals: 18 };
   } else {
     // Default to Chiliz
     return { name: 'Chiliz Spicy Testnet', symbol: 'CHZ', decimals: 18 };
@@ -109,7 +118,7 @@ export function getChainInfo(chainId: number) {
 export const config = getDefaultConfig({
   appName: 'Payment Terminal',
   projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1',
-  chains: [chilizSpicy, circleLayerTestnet, bsc, mainnet],
+  chains: [chilizSpicy, circleLayerTestnet, bsc, mainnet, avalancheFuji],
   ssr: false,
 })
 

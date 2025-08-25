@@ -13,6 +13,7 @@ const chainNames: Record<number, string> = {
   28525: 'circle-layer', // Circle Layer testnet
   56: 'bsc',       // BSC mainnet
   1: 'ethereum',   // Ethereum mainnet
+  43113: 'avalanche-fuji', // Avalanche Fuji testnet
 };
 
 export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ 

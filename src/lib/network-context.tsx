@@ -37,6 +37,12 @@ export const NETWORK_CONFIGS: Record<string, NetworkConfig> = {
     icon: '⟠',
     chainId: 1,
   },
+  'avalanche-fuji': {
+    type: 'evm',
+    name: 'Avalanche Fuji Testnet',
+    icon: '🏔️',
+    chainId: 43113,
+  },
   // Non-EVM Networks
   'stellar-testnet': {
     type: 'stellar',
@@ -108,6 +114,9 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
     } else if (chainId === 1) {
       actualNetwork = 'ethereum';
       networkConfig = NETWORK_CONFIGS['ethereum'];
+    } else if (chainId === 43113) {
+      actualNetwork = 'avalanche-fuji';
+      networkConfig = NETWORK_CONFIGS['avalanche-fuji'];
     } else {
       // Default to chiliz-spicy if unknown chain or no chain connected
       actualNetwork = 'chiliz-spicy';
