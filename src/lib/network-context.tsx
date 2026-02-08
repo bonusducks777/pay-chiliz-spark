@@ -43,6 +43,12 @@ export const NETWORK_CONFIGS: Record<string, NetworkConfig> = {
     icon: '🏔️',
     chainId: 43113,
   },
+  'plasma-testnet': {
+    type: 'evm',
+    name: 'Plasma Testnet',
+    icon: '💜',
+    chainId: 9746,
+  },
   // Non-EVM Networks
   'stellar-testnet': {
     type: 'stellar',
@@ -117,6 +123,9 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
     } else if (chainId === 43113) {
       actualNetwork = 'avalanche-fuji';
       networkConfig = NETWORK_CONFIGS['avalanche-fuji'];
+    } else if (chainId === 9746) {
+      actualNetwork = 'plasma-testnet';
+      networkConfig = NETWORK_CONFIGS['plasma-testnet'];
     } else {
       // Default to chiliz-spicy if unknown chain or no chain connected
       actualNetwork = 'chiliz-spicy';

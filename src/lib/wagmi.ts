@@ -44,6 +44,26 @@ const circleLayerTestnet = {
   testnet: true,
 } as const
 
+// Custom Plasma Testnet configuration
+const plasmaTestnet = {
+  id: 9746,
+  name: 'Plasma Testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'XPL',
+    symbol: 'XPL',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://testnet-rpc.plasma.to'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'Plasma Explorer', url: 'https://testnet.plasma.to' },
+  },
+  testnet: true,
+} as const
+
 
 // Placeholder contracts for other networks
 export const CONTRACTS = {
@@ -52,6 +72,7 @@ export const CONTRACTS = {
   [bsc.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real BSC contract
   [mainnet.id]: '0x0000000000000000000000000000000000000000', // TODO: Replace with real ETH contract
   [avalancheFuji.id]: '0xFb3D22A7faAeF73CCec677658771083D55e38dC0', // Avalanche C-Chain Fuji Testnet
+  [plasmaTestnet.id]: '0x640eC5CC37B33E9EE2Ab9C41004462ee8604AE4C', // Plasma Testnet
 }
 
 // Supported tokens per chain (native + 3 ERC20s)
@@ -92,6 +113,10 @@ export const SUPPORTED_TOKENS: Record<number, Array<{
     { shortcode: 'usdt', address: '0x1f1Be82E0317b18B38f80a37160C0F6F78FaF95e', name: 'Tether USD', symbol: 'USDT.e', decimals: 6 },
     { shortcode: 'wavax', address: '0xd00ae08403B9bbb9124bB305C09058E32C39A48c', name: 'Wrapped AVAX', symbol: 'WAVAX', decimals: 18 },
   ],
+  [plasmaTestnet.id]: [
+    { shortcode: 'native', address: '0x6100E367285b01F48D07953803A2d8dCA5D19873', name: 'Plasma', symbol: 'XPL', decimals: 18 },
+    { shortcode: 'usdt0', address: '0x502012b361AebCE43b26Ec812B74D9a51dB4D412', name: 'USDT0', symbol: 'USDT0', decimals: 6 },
+  ],
 }
 
 export function getSupportedTokens(chainId: number) {
@@ -109,6 +134,8 @@ export function getChainInfo(chainId: number) {
     return { name: 'Ethereum', symbol: 'ETH', decimals: 18 };
   } else if (chainId === avalancheFuji.id) {
     return { name: 'Avalanche Fuji Testnet', symbol: 'AVAX', decimals: 18 };
+  } else if (chainId === plasmaTestnet.id) {
+    return { name: 'Plasma Testnet', symbol: 'XPL', decimals: 18 };
   } else {
     // Default to Chiliz
     return { name: 'Chiliz Spicy Testnet', symbol: 'CHZ', decimals: 18 };
@@ -118,7 +145,7 @@ export function getChainInfo(chainId: number) {
 export const config = getDefaultConfig({
   appName: 'Payment Terminal',
   projectId: '2f81a97e8c70b3b2f8b5a6b4a5b2c8e1',
-  chains: [chilizSpicy, circleLayerTestnet, bsc, mainnet, avalancheFuji],
+  chains: [chilizSpicy, circleLayerTestnet, bsc, mainnet, avalancheFuji, plasmaTestnet],
   ssr: false,
 })
 
