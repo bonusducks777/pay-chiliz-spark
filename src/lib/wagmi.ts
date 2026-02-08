@@ -114,7 +114,7 @@ export const SUPPORTED_TOKENS: Record<number, Array<{
     { shortcode: 'wavax', address: '0xd00ae08403B9bbb9124bB305C09058E32C39A48c', name: 'Wrapped AVAX', symbol: 'WAVAX', decimals: 18 },
   ],
   [plasmaTestnet.id]: [
-    { shortcode: 'native', address: '0x6100E367285b01F48D07953803A2d8dCA5D19873', name: 'Plasma', symbol: 'XPL', decimals: 18 },
+    { shortcode: 'native', address: '0x0000000000000000000000000000000000000000', name: 'Plasma', symbol: 'XPL', decimals: 18 },
     { shortcode: 'usdt0', address: '0x502012b361AebCE43b26Ec812B74D9a51dB4D412', name: 'USDT0', symbol: 'USDT0', decimals: 6 },
   ],
 }
